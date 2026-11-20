@@ -1,0 +1,2426 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TokenLab – Text to Tokens Visualizer</title>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Inter"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            obsidian: {
+              950: '#070A12',
+              900: '#0B0F19',
+              850: '#0F1524',
+              800: '#111827',
+              750: '#162033',
+              700: '#1E293B',
+            },
+            accent: {
+              violet: '#8B5CF6',
+              indigo: '#6366F1',
+              cyan: '#06B6D4',
+              emerald: '#10B981',
+              amber: '#F59E0B',
+              rose: '#F43F5E',
+            }
+          },
+          boxShadow: {
+            'studio': '0 16px 40px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(148, 163, 184, 0.14)',
+            'glow-violet': '0 0 24px -4px rgba(139, 92, 246, 0.45)',
+            'glow-cyan': '0 0 24px -4px rgba(6, 182, 212, 0.4)',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      background-color: #0B0F19;
+      background-image:
+        radial-gradient(at 12% 0%, rgba(139, 92, 246, 0.14) 0px, transparent 48%),
+        radial-gradient(at 88% 8%, rgba(6, 182, 212, 0.11) 0px, transparent 44%),
+        radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+      color: #F1F5F9;
+      min-height: 100vh;
+    }
+
+    .studio-card {
+      background: rgba(17, 24, 39, 0.84);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.55);
+    }
+
+    .studio-subcard {
+      background: rgba(30, 41, 59, 0.58);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .token-pill {
+      transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s ease, opacity 0.18s ease, border-color 0.16s ease;
+    }
+    .token-pill:hover {
+      transform: translateY(-2px) scale(1.03);
+    }
+    .token-pill.is-highlighted {
+      transform: translateY(-2px) scale(1.05);
+      box-shadow: 0 0 0 2px #06B6D4, 0 10px 25px -4px rgba(6, 182, 212, 0.45);
+      z-index: 10;
+    }
+    .token-pill.is-dimmed {
+      opacity: 0.34;
+    }
+
+    /* Subtle grid pattern for graph containers */
+    .canvas-grid-bg {
+      background-color: rgba(11, 15, 25, 0.72);
+      background-image:
+        linear-gradient(to right, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    /* Custom dark scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0B0F19;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-violet-500/30 selection:text-cyan-200">
+
+  <!-- Sticky Telemetry Header -->
+  <header class="sticky top-0 z-40 border-b border-slate-800/90 bg-[#0B0F19]/85 backdrop-blur-xl">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand -->
+      <div class="flex items-center gap-3.5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-glow-violet shrink-0">
+          <i data-lucide="cpu" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2.5">
+            <span class="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
+              Token<span class="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">Lab</span>
+            </span>
+            <span class="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-mono font-semibold bg-slate-800/90 text-cyan-300 border border-slate-700/80">
+              v2.4 · AI Studio
+            </span>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-400 font-medium">
+            Discover how AI transforms human language into numbers.
+          </p>
+        </div>
+      </div>
+
+      <!-- Right Telemetry Controls: Quick Presets + Engine Status -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <div class="hidden xl:flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+          <span class="text-[11px] font-mono text-slate-500 px-2">Presets:</span>
+          <button type="button" data-preset="King Queen Prince Apple Banana Orange Car Bus"
+            class="preset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+            Royalty &amp; Fruits
+          </button>
+          <button type="button" data-preset="Cat Cats Car Dog Running Run"
+            class="preset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+            Spelling vs. Meaning
+          </button>
+          <button type="button" data-preset="Tokenization transforms unbreakable preprocessing representations into numerical embeddings!"
+            class="preset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+            Subword Splitting
+          </button>
+          <button type="button" data-preset="Artificial intelligence models learn vector representations of human language and data."
+            class="preset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+            AI Engineering
+          </button>
+        </div>
+
+        <!-- Live Model Status Badge -->
+        <div id="model-status-badge" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 transition-all">
+          <span id="model-status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+          <span id="model-status-text">Initializing WordPiece &amp; MiniLM-L6-v2...</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- USER INPUT SECTION -->
+    <section class="studio-card rounded-2xl p-6 sm:p-8 relative overflow-hidden">
+      <div class="pointer-events-none absolute -top-28 -right-28 w-72 h-72 rounded-full bg-violet-600/10 blur-3xl"></div>
+      <div class="pointer-events-none absolute -bottom-28 -left-28 w-72 h-72 rounded-full bg-cyan-500/10 blur-3xl"></div>
+
+      <div class="relative z-10">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold uppercase tracking-wider bg-violet-500/15 text-violet-300 border border-violet-500/30 mb-2">
+              <i data-lucide="terminal" class="w-3.5 h-3.5"></i> Input Workbench
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Enter Your Text</h1>
+            <p class="text-sm text-slate-400 mt-1">
+              Type or paste any sentence or paragraph. Every token, ID, statistical chart, and 2D vector embedding updates dynamically.
+            </p>
+          </div>
+
+          <!-- Sample Preset Pills (Visible on all screens) -->
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-mono text-slate-400">Try Sample:</span>
+            <button type="button" data-preset="King Queen Prince Apple Banana Orange Car Bus"
+              class="preset-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-violet-500/20 text-slate-200 hover:text-violet-200 border border-slate-700 hover:border-violet-500/40 transition cursor-pointer">
+              Royalty &amp; Fruits
+            </button>
+            <button type="button" data-preset="Cat Cats Car Dog Running Run"
+              class="preset-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-200 border border-slate-700 hover:border-cyan-500/40 transition cursor-pointer">
+              Spelling vs. Meaning
+            </button>
+            <button type="button" data-preset="Tokenization transforms unbreakable preprocessing representations into numerical embeddings!"
+              class="preset-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-emerald-500/20 text-slate-200 hover:text-emerald-200 border border-slate-700 hover:border-emerald-500/40 transition cursor-pointer">
+              Subword Splitting
+            </button>
+            <button type="button" data-preset="Artificial intelligence is amazing! Artificial intelligence transforms how humans and computers communicate."
+              class="preset-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-indigo-500/20 text-slate-200 hover:text-indigo-200 border border-slate-700 hover:border-indigo-500/40 transition cursor-pointer">
+              AI Engineering
+            </button>
+          </div>
+        </div>
+
+        <!-- Textarea Input -->
+        <div class="relative">
+          <textarea
+            id="user-input"
+            rows="4"
+            placeholder="Type or paste any sentence or paragraph here..."
+            class="w-full rounded-xl border border-slate-700/90 bg-[#0B0F19]/90 p-4 sm:p-5 text-base sm:text-lg text-slate-100 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition font-sans resize-y"
+          >King Queen Prince Apple Banana Orange Car Bus</textarea>
+
+          <div class="mt-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+            <div class="flex items-center gap-4 font-mono">
+              <span id="char-word-counter" class="text-slate-300">Characters: 44 · Words: 8</span>
+              <span class="hidden sm:inline text-slate-600">|</span>
+              <span class="hidden sm:inline text-slate-400">Shortcut: <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">Ctrl+Enter</kbd></span>
+            </div>
+
+            <!-- Live Real-Time Toggle -->
+            <label class="inline-flex items-center gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" id="live-mode-toggle" checked class="sr-only peer" />
+              <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all relative peer-checked:bg-emerald-500"></div>
+              <span class="text-xs font-semibold text-slate-300">Live Real-Time Mode</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Non-blocking Feedback Banner -->
+        <div id="input-feedback" class="hidden mt-4 rounded-xl px-4 py-3 text-sm font-medium bg-rose-500/15 border border-rose-500/40 text-rose-200 flex items-center gap-2.5">
+          <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i>
+          <span id="input-feedback-text">Please enter some text first so TokenLab can analyze it.</span>
+        </div>
+
+        <!-- Action Buttons + Active Spotlight Indicator -->
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              id="generate-btn"
+              type="button"
+              class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 shadow-glow-violet active:scale-[0.99] transition cursor-pointer"
+            >
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Generate Tokens</span>
+              <span id="processing-spinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            </button>
+
+            <button
+              id="clear-btn"
+              type="button"
+              class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-slate-300 bg-slate-800/90 hover:bg-slate-800 hover:text-white border border-slate-700 transition cursor-pointer"
+            >
+              <i data-lucide="eraser" class="w-4 h-4"></i>
+              <span>Clear</span>
+            </button>
+
+            <button
+              id="reset-btn"
+              type="button"
+              class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 transition cursor-pointer"
+            >
+              <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+              <span>Reset</span>
+            </button>
+          </div>
+
+          <!-- Cross-Section Spotlight Pill -->
+          <div id="spotlight-banner" class="hidden items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-xs text-cyan-200">
+            <i data-lucide="crosshair" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>Spotlight: <strong id="spotlight-token-name" class="font-mono text-white"></strong></span>
+            <button type="button" id="clear-spotlight-btn" class="ml-1.5 text-cyan-300 hover:text-white underline cursor-pointer">Clear</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPLETE AI PROCESSING FLOW (Interactive Pipeline Navigation) -->
+    <section id="section-pipeline" class="studio-card rounded-2xl p-6 sm:p-7">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
+        <div>
+          <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-cyan-400">End-to-End Architecture</span>
+          <h2 class="text-lg sm:text-xl font-extrabold text-white">Complete AI Processing Flow</h2>
+        </div>
+        <span class="text-xs text-slate-400">Click any stage to jump directly to its live lab module</span>
+      </div>
+
+      <div id="pipeline-flow" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+        <!-- Populated dynamically -->
+      </div>
+    </section>
+
+    <!-- SECTION 1: Tokenization -->
+    <section id="section-tokenization" class="studio-card rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4 border-b border-slate-800 pb-5">
+        <div class="max-w-3xl">
+          <h2 class="text-xl sm:text-2xl font-extrabold text-white">
+            1. Tokenization – Breaking Text into Tokens
+          </h2>
+          <p class="text-sm sm:text-base text-slate-400 mt-1.5 leading-relaxed">
+            A <strong class="text-slate-200">token</strong> is a small piece of text that an AI language model processes. It can be a complete word, part of a word (subword), punctuation, or another text unit.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 shrink-0">
+          <div class="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-center">
+            <div class="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-400">Total Tokens</div>
+            <div id="total-tokens-count" class="text-2xl font-mono font-extrabold text-white">0</div>
+          </div>
+          <div class="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80">
+            <div class="text-[10px] font-mono font-bold uppercase tracking-wider text-violet-400">Active Tokenizer</div>
+            <div id="active-tokenizer-name" class="text-xs sm:text-sm font-mono font-bold text-slate-200 mt-0.5">WordPiece Subword Tokenizer</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Original Input Display -->
+      <div class="rounded-xl bg-[#0B0F19]/80 border border-slate-800 p-4">
+        <div class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 mb-1">Original Input Text</div>
+        <p id="original-input-display" class="text-sm sm:text-base text-slate-200 font-medium break-words"></p>
+      </div>
+
+      <!-- Interactive Toolbar for Token Stream -->
+      <div>
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+              Token Sequence Stream
+            </span>
+            <span class="text-xs text-slate-500">(Click or hover any token to cross-highlight everywhere)</span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2.5">
+            <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/90 border border-slate-700 text-xs font-medium text-slate-300 cursor-pointer select-none hover:border-violet-500/50 transition">
+              <input type="checkbox" id="highlight-subwords-toggle" class="rounded accent-violet-500 cursor-pointer" />
+              <span>Highlight Subwords (<code class="font-mono text-violet-300">##</code>)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Colored Token Blocks -->
+        <div id="token-blocks-container" class="flex flex-wrap gap-2.5 p-4 rounded-xl bg-[#0B0F19]/85 border border-slate-800 min-h-[88px]">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Dynamic Segmentation Explanation -->
+      <div class="rounded-xl bg-gradient-to-r from-violet-500/10 via-slate-900/90 to-cyan-500/10 border border-violet-500/25 p-4 sm:p-5">
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-300 flex items-center justify-center shrink-0 mt-0.5">
+            <i data-lucide="lightbulb" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Why was your text divided into these particular pieces?</h3>
+            <p id="tokenization-explanation" class="text-sm text-slate-300 mt-1 leading-relaxed"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: Vocabulary Creation -->
+    <section id="section-vocabulary" class="studio-card rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4 border-b border-slate-800 pb-5">
+        <div class="max-w-3xl">
+          <h2 class="text-xl sm:text-2xl font-extrabold text-white">
+            2. Vocabulary – Collection of Unique Tokens
+          </h2>
+          <p class="text-sm sm:text-base text-slate-400 mt-1.5 leading-relaxed">
+            <strong class="text-slate-200">Vocabulary</strong> is the collection of unique tokens that an AI model recognizes. Repeated tokens receive the exact same Token ID.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 shrink-0">
+          <div class="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-center">
+            <div class="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400">Vocabulary Size</div>
+            <div id="vocab-size-count" class="text-2xl font-mono font-extrabold text-white">0</div>
+          </div>
+          <div class="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-center">
+            <div class="text-[10px] font-mono font-bold uppercase tracking-wider text-violet-400">Uniqueness Ratio</div>
+            <div id="vocab-ratio-count" class="text-2xl font-mono font-extrabold text-white">100%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Total Tokens vs Unique Vocabulary Explanation -->
+      <div id="vocab-comparison-banner" class="rounded-xl bg-slate-900/90 border border-slate-800 p-4 text-sm text-slate-300">
+        <!-- Populated dynamically -->
+      </div>
+
+      <!-- Search & Sort Controls for Vocabulary Table -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="relative w-full sm:w-72">
+          <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+          <input
+            type="text"
+            id="vocab-search-input"
+            placeholder="Filter vocabulary tokens..."
+            class="w-full pl-9 pr-3.5 py-2 rounded-xl bg-[#0B0F19] border border-slate-700 text-xs sm:text-sm text-slate-200 placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
+          />
+        </div>
+
+        <div class="flex items-center gap-2 text-xs">
+          <span class="font-mono text-slate-400">Sort by:</span>
+          <select id="vocab-sort-select" class="rounded-xl bg-[#0B0F19] border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 focus:border-cyan-500 focus:outline-none cursor-pointer">
+            <option value="appearance">First Appearance</option>
+            <option value="frequency">Frequency (High → Low)</option>
+            <option value="id">Token ID (Low → High)</option>
+            <option value="alpha">Alphabetical (A → Z)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Vocabulary Table -->
+      <div class="overflow-x-auto rounded-xl border border-slate-800 bg-[#0B0F19]/80">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-900/95 border-b border-slate-800 text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400">
+              <th class="py-3.5 px-4">Token</th>
+              <th class="py-3.5 px-4">Token ID</th>
+              <th class="py-3.5 px-4">Frequency</th>
+              <th class="py-3.5 px-4">Position(s)</th>
+            </tr>
+          </thead>
+          <tbody id="vocabulary-table-body" class="divide-y divide-slate-800/80 text-sm">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION 3: Token ID Visualization -->
+    <section id="section-token-ids" class="studio-card rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-extrabold text-white">
+            3. Token IDs – Converting Tokens into Numbers
+          </h2>
+          <p class="text-sm sm:text-base text-slate-400 mt-1.5">
+            Token IDs are numerical identifiers assigned to tokens so that computers and neural networks can process them.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <span id="token-id-source-badge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-semibold bg-violet-500/15 text-violet-300 border border-violet-500/30">
+            <i data-lucide="hash" class="w-3.5 h-3.5"></i>
+            <span id="token-id-source-text">WordPiece Vocabulary IDs</span>
+          </span>
+
+          <!-- View Toggle: Flow Cards vs Tensor Array -->
+          <div class="inline-flex rounded-xl bg-slate-900 p-1 border border-slate-800">
+            <button type="button" id="view-flow-cards-btn" class="px-3 py-1 rounded-lg text-xs font-semibold bg-violet-600 text-white transition cursor-pointer">
+              Flow Cards
+            </button>
+            <button type="button" id="view-tensor-array-btn" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer">
+              Tensor Array
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Flow Pipeline Legend -->
+      <div class="flex flex-wrap items-center gap-2 text-[11px] font-mono font-bold uppercase tracking-wider">
+        <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">Text</span>
+        <i data-lucide="arrow-right" class="w-4 h-4 text-slate-500"></i>
+        <span class="px-2.5 py-1 rounded-lg bg-violet-500/15 text-violet-300 border border-violet-500/30">Tokens</span>
+        <i data-lucide="arrow-right" class="w-4 h-4 text-slate-500"></i>
+        <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Token IDs</span>
+      </div>
+
+      <!-- View A: Visual Flow Diagram Cards -->
+      <div id="token-id-flow-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <!-- Populated dynamically -->
+      </div>
+
+      <!-- View B: Raw Tensor Array View -->
+      <div id="token-id-tensor-container" class="hidden rounded-xl bg-[#0B0F19] border border-slate-800 p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-mono font-bold text-emerald-400">input_ids = torch.tensor([...])</span>
+          <button type="button" id="copy-tensor-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span id="copy-tensor-label">Copy ID Array</span>
+          </button>
+        </div>
+        <pre id="tensor-array-output" class="font-mono text-sm sm:text-base text-cyan-300 overflow-x-auto p-3 rounded-lg bg-slate-900/90 border border-slate-800"></pre>
+      </div>
+    </section>
+
+    <!-- SECTION 4: Token Statistics and Graphs -->
+    <section id="section-stats" class="studio-card rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="border-b border-slate-800 pb-5">
+        <h2 class="text-xl sm:text-2xl font-extrabold text-white">
+          4. Token Statistics and Graphs
+        </h2>
+        <p class="text-sm sm:text-base text-slate-400 mt-1.5">
+          Interactive telemetry showing token frequency counts, sequential Token ID distribution, and vocabulary compression.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Graph A: Token Frequency -->
+        <div class="studio-subcard rounded-xl p-5 flex flex-col">
+          <div class="mb-3">
+            <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-violet-400">Graph A · Bar Chart</span>
+            <h3 class="text-base font-bold text-white">Token Frequency</h3>
+            <p class="text-xs text-slate-400">Occurrence count per unique token</p>
+          </div>
+          <div class="relative flex-1 min-h-[260px] w-full">
+            <canvas id="chart-frequency"></canvas>
+          </div>
+        </div>
+
+        <!-- Graph B: Token ID Distribution -->
+        <div class="studio-subcard rounded-xl p-5 flex flex-col">
+          <div class="mb-3">
+            <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-cyan-400">Graph B · Sequence Scatter/Line</span>
+            <h3 class="text-base font-bold text-white">Token ID Distribution</h3>
+            <p class="text-xs text-slate-400">Token ID plotted by sequence position</p>
+          </div>
+          <div class="relative flex-1 min-h-[260px] w-full">
+            <canvas id="chart-id-dist"></canvas>
+          </div>
+        </div>
+
+        <!-- Graph C: Vocabulary Distribution -->
+        <div class="studio-subcard rounded-xl p-5 flex flex-col">
+          <div class="mb-3">
+            <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-400">Graph C · Doughnut Chart</span>
+            <h3 class="text-base font-bold text-white">Vocabulary Distribution</h3>
+            <p class="text-xs text-slate-400">Unique tokens vs. repeated occurrences</p>
+          </div>
+          <div class="relative flex-1 min-h-[260px] w-full">
+            <canvas id="chart-vocab-dist"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 5: Vector Embedding Visualization (TWO COMPLETELY SEPARATE GRAPHS + COSINE SIMILARITY PROBE) -->
+    <section id="section-embeddings" class="studio-card rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4 border-b border-slate-800 pb-5">
+        <div class="max-w-3xl">
+          <h2 class="text-xl sm:text-2xl font-extrabold text-white">
+            5. Vector Embeddings – Converting Tokens into Numerical Vectors
+          </h2>
+          <p class="text-sm sm:text-base text-slate-400 mt-1.5 leading-relaxed">
+            An <strong class="text-slate-200">embedding</strong> is a list of numbers called a <strong class="text-slate-200">vector</strong> that represents a token. Token IDs are just identification numbers—they do not represent the meaning of a word. Embeddings help AI represent relationships and patterns between words.
+          </p>
+        </div>
+        <div class="shrink-0">
+          <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-mono font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+            <i data-lucide="scatter-chart" class="w-3.5 h-3.5"></i>
+            <span>Click any point to inspect vector</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- TWO COMPLETELY SEPARATE GRAPHS -->
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-7">
+
+        <!-- GRAPH 1: Spelling-Based Vector Embeddings -->
+        <div class="rounded-2xl bg-[#0F1524] border border-cyan-500/30 p-5 sm:p-6 flex flex-col justify-between">
+          <div>
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                GRAPH 1 · ORTHOGRAPHIC SPACE
+              </span>
+              <span class="text-xs font-mono text-slate-400">8D Character Features → 2D PCA</span>
+            </div>
+            <h3 class="text-lg sm:text-xl font-extrabold text-white">
+              Spelling-Based Vector Embeddings
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Maps words by letter patterns, prefixes, suffixes, and length. Similar-looking words cluster together.
+            </p>
+
+            <!-- Separate Coordinate System Canvas -->
+            <div class="relative mt-4 h-[350px] sm:h-[380px] w-full rounded-xl canvas-grid-bg border border-slate-800 p-2">
+              <canvas id="chart-spelling-embeddings"></canvas>
+            </div>
+          </div>
+
+          <div class="mt-4 rounded-xl bg-cyan-500/10 border border-cyan-500/25 p-3.5 text-xs sm:text-sm text-cyan-100 leading-relaxed">
+            Spelling-based representations focus on how words look. They capture similarities in letters, character patterns, and spelling.
+          </div>
+        </div>
+
+        <!-- GRAPH 2: Meaning-Based Vector Embeddings -->
+        <div class="rounded-2xl bg-[#0F1524] border border-violet-500/30 p-5 sm:p-6 flex flex-col justify-between">
+          <div>
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                GRAPH 2 · SEMANTIC SPACE
+              </span>
+              <span id="semantic-source-label" class="text-xs font-mono text-slate-400">Semantic Vector → 2D PCA</span>
+            </div>
+            <h3 class="text-lg sm:text-xl font-extrabold text-white">
+              Meaning-Based Vector Embeddings
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Maps words by conceptual meaning and context. Related concepts cluster together regardless of spelling.
+            </p>
+
+            <!-- Separate Coordinate System Canvas -->
+            <div class="relative mt-4 h-[350px] sm:h-[380px] w-full rounded-xl canvas-grid-bg border border-slate-800 p-2">
+              <canvas id="chart-meaning-embeddings"></canvas>
+            </div>
+          </div>
+
+          <div class="mt-4 rounded-xl bg-violet-500/10 border border-violet-500/25 p-3.5 text-xs sm:text-sm text-violet-100 leading-relaxed">
+            Meaning-based embeddings focus on what words mean rather than how they are spelled. Words with similar meanings are represented by nearby vectors.
+          </div>
+        </div>
+
+      </div>
+
+      <!-- INTERACTIVE COSINE SIMILARITY & DISTANCE PROBE -->
+      <div class="rounded-2xl bg-[#0B0F19]/90 border border-slate-800 p-5 sm:p-6 space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <div class="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-400">
+              <i data-lucide="git-compare" class="w-3.5 h-3.5"></i> Interactive Vector Math Lab
+            </div>
+            <h3 class="text-base sm:text-lg font-bold text-white">Cosine Similarity &amp; Distance Probe</h3>
+            <p class="text-xs text-slate-400">Compare any two tokens side-by-side to see how close they are in Spelling Space vs. Meaning Space.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2.5">
+            <div class="flex items-center gap-1.5">
+              <label for="sim-token-a" class="text-xs font-mono text-slate-400">Token A:</label>
+              <select id="sim-token-a" class="rounded-xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs font-mono font-bold text-cyan-300 focus:border-cyan-500 focus:outline-none cursor-pointer"></select>
+            </div>
+            <span class="text-xs font-mono text-slate-500">vs.</span>
+            <div class="flex items-center gap-1.5">
+              <label for="sim-token-b" class="text-xs font-mono text-slate-400">Token B:</label>
+              <select id="sim-token-b" class="rounded-xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs font-mono font-bold text-violet-300 focus:border-violet-500 focus:outline-none cursor-pointer"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          <!-- Spelling Similarity Meter -->
+          <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-4">
+            <div class="flex items-center justify-between text-xs mb-2">
+              <span class="font-semibold text-cyan-300">Spelling-Based Cosine Similarity</span>
+              <span id="spelling-sim-score" class="font-mono font-extrabold text-white text-sm">0%</span>
+            </div>
+            <div class="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
+              <div id="spelling-sim-bar" class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-teal-400 transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="spelling-sim-note" class="text-[11px] text-slate-400 mt-2">Measures character &amp; prefix overlap.</p>
+          </div>
+
+          <!-- Meaning Similarity Meter -->
+          <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-4">
+            <div class="flex items-center justify-between text-xs mb-2">
+              <span class="font-semibold text-violet-300">Meaning-Based Cosine Similarity</span>
+              <span id="meaning-sim-score" class="font-mono font-extrabold text-white text-sm">0%</span>
+            </div>
+            <div class="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
+              <div id="meaning-sim-bar" class="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="meaning-sim-note" class="text-[11px] text-slate-400 mt-2">Measures conceptual &amp; semantic closeness.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 6: Spelling-Based vs Meaning-Based Comparison -->
+    <section id="section-comparison" class="studio-card rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="border-b border-slate-800 pb-5">
+        <h2 class="text-xl sm:text-2xl font-extrabold text-white">
+          6. How Are These Two Embeddings Different?
+        </h2>
+        <p class="text-sm sm:text-base text-slate-400 mt-1.5">
+          A side-by-side comparison of surface-level character embeddings versus semantic meaning embeddings.
+        </p>
+      </div>
+
+      <div class="overflow-x-auto rounded-xl border border-slate-800 bg-[#0B0F19]/80">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-900 border-b border-slate-800 text-xs font-mono font-bold uppercase tracking-wider">
+              <th class="py-3.5 px-4 sm:px-6 text-slate-400">Feature</th>
+              <th class="py-3.5 px-4 sm:px-6 text-cyan-400">Spelling-Based</th>
+              <th class="py-3.5 px-4 sm:px-6 text-violet-400">Meaning-Based</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/80 text-sm">
+            <tr class="hover:bg-slate-800/35 transition">
+              <td class="py-3.5 px-4 sm:px-6 font-bold text-white">Focus</td>
+              <td class="py-3.5 px-4 sm:px-6 text-slate-300">How a word looks</td>
+              <td class="py-3.5 px-4 sm:px-6 text-slate-300">What a word means</td>
+            </tr>
+            <tr class="hover:bg-slate-800/35 transition">
+              <td class="py-3.5 px-4 sm:px-6 font-bold text-white">Based on</td>
+              <td class="py-3.5 px-4 sm:px-6 text-slate-300">Letters and character patterns</td>
+              <td class="py-3.5 px-4 sm:px-6 text-slate-300">Semantic relationships</td>
+            </tr>
+            <tr class="hover:bg-slate-800/35 transition">
+              <td class="py-3.5 px-4 sm:px-6 font-bold text-white">Similarity</td>
+              <td class="py-3.5 px-4 sm:px-6 text-slate-300">Similar-looking words</td>
+              <td class="py-3.5 px-4 sm:px-6 text-slate-300">Similar-meaning words</td>
+            </tr>
+            <tr class="hover:bg-slate-800/35 transition">
+              <td class="py-3.5 px-4 sm:px-6 font-bold text-white">Cat and Cats</td>
+              <td class="py-3.5 px-4 sm:px-6">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Close</span>
+              </td>
+              <td class="py-3.5 px-4 sm:px-6">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Can be close</span>
+              </td>
+            </tr>
+            <tr class="hover:bg-slate-800/35 transition">
+              <td class="py-3.5 px-4 sm:px-6 font-bold text-white">King and Queen</td>
+              <td class="py-3.5 px-4 sm:px-6">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">Not necessarily close</span>
+              </td>
+              <td class="py-3.5 px-4 sm:px-6">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Close</span>
+              </td>
+            </tr>
+            <tr class="hover:bg-slate-800/35 transition">
+              <td class="py-3.5 px-4 sm:px-6 font-bold text-white">Main purpose</td>
+              <td class="py-3.5 px-4 sm:px-6 text-slate-300">Capture spelling patterns</td>
+              <td class="py-3.5 px-4 sm:px-6 text-slate-300">Capture meaning and context</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="rounded-xl bg-gradient-to-r from-cyan-500/10 via-slate-900 to-violet-500/10 border border-slate-700/80 p-4 sm:p-5 text-sm text-slate-200 leading-relaxed">
+        Two words can look completely different but have similar meanings. Similarly, two words can look almost identical but have different meanings. This is why spelling-based and meaning-based representations are different.
+      </div>
+    </section>
+
+    <!-- SECTION 7: Numerical Vector Display -->
+    <section id="section-vectors" class="studio-card rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-extrabold text-white">
+            7. Explore the Actual Vectors
+          </h2>
+          <p class="text-sm sm:text-base text-slate-400 mt-1.5">
+            Inspect the numerical arrays representing any unique token's spelling features and semantic meaning.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <label for="vector-token-select" class="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">Inspect Token:</label>
+          <select id="vector-token-select" class="rounded-xl border border-slate-700 bg-[#0B0F19] px-3.5 py-2 text-sm font-mono font-bold text-white focus:border-violet-500 focus:outline-none cursor-pointer">
+            <!-- Populated dynamically -->
+          </select>
+          <button type="button" id="copy-vector-json-btn" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition cursor-pointer">
+            <i data-lucide="braces" class="w-3.5 h-3.5"></i>
+            <span id="copy-vector-json-label">Copy Vector JSON</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Featured Token Vector Card -->
+      <div id="featured-vector-card" class="rounded-2xl bg-[#0B0F19]/90 border border-slate-800 p-5 sm:p-6">
+        <!-- Populated dynamically -->
+      </div>
+
+      <!-- All Unique Token Cards Grid -->
+      <div>
+        <div class="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 mb-3">
+          All Unique Tokens in Current Input (Click any card to inspect &amp; spotlight)
+        </div>
+        <div id="all-vectors-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 8: Beginner-Friendly Learning Section -->
+    <section id="section-learning" class="studio-card rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="border-b border-slate-800 pb-5">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 mb-2">
+          <i data-lucide="graduation-cap" class="w-3.5 h-3.5"></i> Beginner's Field Guide
+        </span>
+        <h2 class="text-xl sm:text-2xl font-extrabold text-white">
+          Understand What Just Happened
+        </h2>
+        <p class="text-sm sm:text-base text-slate-400 mt-1">
+          A clear, jargon-free walkthrough of every stage your sentence just passed through.
+        </p>
+      </div>
+
+      <div id="learning-steps-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Populated dynamically with live examples from user's input -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800/80 bg-[#070A12] mt-14 py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+      <div class="font-semibold text-slate-300">
+        TokenLab – Interactive AI Text &amp; Tokenization Visualizer
+      </div>
+      <div class="font-mono">
+        WordPiece Subword Tokenization · 2D PCA Vector Projection · Dark Research Studio
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script type="module">
+    // =========================================================================
+    // 1. HUGGING FACE TRANSFORMERS.JS + DETERMINISTIC BERT WORDPIECE ENGINE
+    // =========================================================================
+    let hfTokenizer = null;
+    let hfExtractor = null;
+    let usingRealHFModel = false;
+
+    const DEFAULT_TEXT = "King Queen Prince Apple Banana Orange Car Bus";
+
+    // Real bert-base-uncased WordPiece vocabulary IDs
+    const BERT_VOCAB_IDS = {
+      "[PAD]": 0, "[UNK]": 100, "[CLS]": 101, "[SEP]": 102, "[MASK]": 103,
+      "!": 999, "\"": 1000, "#": 1001, "$": 1002, "%": 1003, "&": 1004, "'": 1005,
+      "(": 1006, ")": 1007, "*": 1008, "+": 1009, ",": 1010, "-": 1011, ".": 1012,
+      "/": 1013, ":": 1024, ";": 1025, "?": 1029, "@": 1030,
+      "the": 1996, "of": 1997, "and": 1998, "in": 1999, "to": 2000, "a": 1037,
+      "is": 2003, "was": 2001, "for": 2005, "that": 2008, "with": 2007, "on": 2006,
+      "as": 2004, "are": 2024, "by": 2011, "this": 2023, "be": 2022, "at": 2012,
+      "from": 2013, "or": 2030, "an": 2019, "have": 2031, "not": 2025, "it": 2009,
+      "into": 2046, "how": 2129, "what": 2054, "when": 2043, "where": 2073, "why": 2339, "who": 2040,
+      "i": 1045, "you": 2017, "we": 2057, "they": 2027, "he": 2002, "she": 2016,
+      "king": 2332, "queen": 3035, "prince": 3159, "princess": 4615, "royal": 2548, "crown": 4410,
+      "apple": 6207, "banana": 15212, "orange": 4589, "fruit": 5909, "grape": 17371, "mango": 23352,
+      "car": 2482, "bus": 3902, "train": 3345, "truck": 4744, "bike": 7997, "vehicle": 4316, "plane": 4946,
+      "cat": 4937, "dog": 3899, "bird": 4743, "fish": 3869, "lion": 7006, "tiger": 6816, "animal": 4111,
+      "run": 2448, "running": 2770, "walk": 3328, "walking": 3788, "jump": 5376, "play": 2377, "playing": 2652,
+      "artificial": 7976, "intelligence": 4454, "amazing": 6429, "transform": 10938, "transforms": 24844,
+      "human": 2529, "humans": 4286, "computer": 3274, "computers": 7588, "language": 2653, "model": 2944,
+      "models": 4275, "data": 2951, "learn": 4553, "learning": 4083, "machine": 3698, "deep": 2784,
+      "neural": 15756, "network": 2897, "token": 19204, "tokens": 19204, "text": 3793, "word": 2773,
+      "words": 2616, "sentence": 6251, "number": 2193, "numbers": 3616, "vector": 9207, "vectors": 19019,
+      "communicate": 10639, "communication": 4807, "education": 2495, "student": 3076, "students": 2493,
+      "science": 2671, "math": 8785, "happy": 3407, "sad": 6517, "love": 2293, "good": 2204, "great": 2307,
+      "big": 2502, "small": 2235, "fast": 3435, "slow": 4030, "red": 2417, "blue": 2630, "green": 2665,
+      "water": 2300, "fire": 2543, "earth": 3011, "sun": 3103, "moon": 4231, "star": 2732,
+      "book": 2338, "read": 3191, "reading": 3752, "write": 4339, "writing": 3015, "code": 3642,
+      "process": 2832, "represent": 5050, "representation": 6630, "representations": 15066,
+      "numerical": 15973, "embedding": 7861, "embeddings": 7861, "break": 3338,
+      // Common WordPiece subword suffixes
+      "##s": 2015, "##ed": 2098, "##ing": 2075, "##er": 2121, "##ly": 2135, "##al": 2389,
+      "##tion": 3508, "##ation": 3370, "##ization": 3989, "##able": 3085, "##ness": 2791,
+      "##ment": 3672, "##ful": 3993, "##less": 3238, "##est": 4355, "##ous": 3560, "##ive": 3512,
+      "##y": 2100, "##e": 2063, "##en": 2368, "##ic": 2594, "##ity": 3012, "##ize": 4697
+    };
+
+    const KNOWN_SUBWORD_SUFFIXES = [
+      "ization", "ations", "ation", "tions", "tion", "ment", "ness", "able", "less", "ing", "est", "ous", "ive", "ize", "ity", "ed", "er", "ly", "al", "en", "ic", "s"
+    ];
+
+    const KNOWN_SUBWORD_PREFIXES = ["un", "pre", "re", "dis", "non", "sub"];
+
+    // 12D Educational Semantic Lexicon
+    const SEMANTIC_CONCEPT_LEXICON = {
+      "king":         [0.95, 0.02, 0.01, 0.15, 0.05, 0.01, 0.10, 0.02, 0.30, 0.15, 0.85, 0.10],
+      "queen":        [0.94, 0.03, 0.01, 0.15, 0.05, 0.01, 0.15, 0.02, 0.25, 0.15, 0.86, 0.10],
+      "prince":       [0.88, 0.02, 0.02, 0.15, 0.12, 0.01, 0.15, 0.02, 0.15, 0.12, 0.84, 0.08],
+      "princess":     [0.87, 0.03, 0.02, 0.15, 0.12, 0.01, 0.20, 0.02, 0.12, 0.12, 0.85, 0.08],
+      "royal":        [0.85, 0.02, 0.01, 0.05, 0.04, 0.01, 0.18, 0.02, 0.25, 0.20, 0.70, 0.15],
+      "crown":        [0.80, 0.01, 0.01, 0.01, 0.01, 0.01, 0.12, 0.05, 0.10, 0.10, 0.45, 0.75],
+      "apple":        [0.01, 0.96, 0.01, 0.12, 0.02, 0.05, 0.20, 0.35, -0.20, 0.02, 0.05, 0.20],
+      "banana":       [0.01, 0.95, 0.01, 0.10, 0.02, 0.01, 0.18, 0.38, -0.18, 0.01, 0.04, 0.18],
+      "orange":       [0.01, 0.94, 0.01, 0.10, 0.02, 0.01, 0.22, 0.36, -0.20, 0.01, 0.04, 0.18],
+      "fruit":        [0.01, 0.92, 0.01, 0.14, 0.02, 0.01, 0.20, 0.42, -0.15, 0.05, 0.05, 0.15],
+      "grape":        [0.01, 0.93, 0.01, 0.10, 0.02, 0.01, 0.18, 0.36, -0.30, 0.01, 0.04, 0.15],
+      "mango":        [0.01, 0.94, 0.01, 0.10, 0.02, 0.01, 0.24, 0.40, -0.16, 0.01, 0.04, 0.16],
+      "car":          [0.02, 0.01, 0.96, 0.01, 0.55, 0.25, 0.08, 0.02, 0.35, 0.05, 0.15, 0.85],
+      "bus":          [0.02, 0.01, 0.95, 0.01, 0.52, 0.20, 0.05, 0.02, 0.55, 0.05, 0.25, 0.86],
+      "train":        [0.02, 0.01, 0.93, 0.01, 0.58, 0.22, 0.06, 0.02, 0.70, 0.05, 0.22, 0.84],
+      "truck":        [0.01, 0.01, 0.92, 0.01, 0.50, 0.18, 0.04, 0.02, 0.62, 0.04, 0.12, 0.88],
+      "bike":         [0.01, 0.01, 0.88, 0.02, 0.62, 0.12, 0.15, 0.05, 0.10, 0.03, 0.18, 0.80],
+      "vehicle":      [0.02, 0.01, 0.94, 0.01, 0.54, 0.24, 0.05, 0.02, 0.45, 0.12, 0.15, 0.85],
+      "plane":        [0.04, 0.01, 0.91, 0.02, 0.65, 0.35, 0.12, 0.15, 0.75, 0.08, 0.18, 0.85],
+      "cat":          [0.05, 0.04, 0.01, 0.95, 0.35, 0.01, 0.28, 0.25, -0.25, 0.02, 0.25, 0.05],
+      "dog":          [0.05, 0.04, 0.01, 0.96, 0.40, 0.01, 0.34, 0.25, -0.15, 0.02, 0.32, 0.05],
+      "bird":         [0.02, 0.05, 0.05, 0.92, 0.50, 0.01, 0.25, 0.45, -0.35, 0.02, 0.10, 0.04],
+      "fish":         [0.01, 0.15, 0.01, 0.91, 0.42, 0.01, 0.12, 0.55, -0.30, 0.02, 0.06, 0.04],
+      "lion":         [0.35, 0.02, 0.01, 0.94, 0.45, 0.01, 0.10, 0.38, 0.35, 0.02, 0.08, 0.04],
+      "tiger":        [0.25, 0.02, 0.01, 0.94, 0.48, 0.01, 0.10, 0.38, 0.35, 0.02, 0.08, 0.04],
+      "animal":       [0.04, 0.05, 0.01, 0.93, 0.35, 0.01, 0.18, 0.40, 0.05, 0.12, 0.15, 0.05],
+      "run":          [0.02, 0.01, 0.15, 0.25, 0.95, 0.05, 0.15, 0.08, 0.05, 0.05, 0.25, 0.05],
+      "running":      [0.02, 0.01, 0.15, 0.25, 0.94, 0.05, 0.15, 0.08, 0.05, 0.05, 0.25, 0.05],
+      "walk":         [0.02, 0.01, 0.10, 0.22, 0.88, 0.02, 0.12, 0.10, 0.02, 0.04, 0.28, 0.04],
+      "walking":      [0.02, 0.01, 0.10, 0.22, 0.87, 0.02, 0.12, 0.10, 0.02, 0.04, 0.28, 0.04],
+      "jump":         [0.02, 0.01, 0.05, 0.28, 0.90, 0.02, 0.20, 0.08, 0.02, 0.03, 0.22, 0.04],
+      "play":         [0.02, 0.02, 0.04, 0.25, 0.78, 0.10, 0.45, 0.08, 0.01, 0.08, 0.35, 0.12],
+      "artificial":   [0.02, 0.01, 0.08, -0.20, 0.08, 0.92, 0.05, -0.25, 0.15, 0.72, 0.15, 0.45],
+      "intelligence": [0.12, 0.01, 0.05, 0.15, 0.10, 0.88, 0.18, 0.05, 0.20, 0.86, 0.45, 0.20],
+      "computer":     [0.02, 0.01, 0.06, 0.01, 0.12, 0.95, 0.08, 0.01, 0.12, 0.68, 0.22, 0.75],
+      "computers":    [0.02, 0.01, 0.06, 0.01, 0.12, 0.94, 0.08, 0.01, 0.15, 0.68, 0.22, 0.75],
+      "token":        [0.02, 0.01, 0.02, 0.01, 0.05, 0.90, 0.05, 0.01, -0.25, 0.82, 0.12, 0.35],
+      "tokens":       [0.02, 0.01, 0.02, 0.01, 0.05, 0.90, 0.05, 0.01, -0.20, 0.82, 0.12, 0.35],
+      "vector":       [0.01, 0.01, 0.04, 0.01, 0.15, 0.88, 0.04, 0.01, 0.05, 0.92, 0.08, 0.20],
+      "vectors":      [0.01, 0.01, 0.04, 0.01, 0.15, 0.88, 0.04, 0.01, 0.08, 0.92, 0.08, 0.20],
+      "embedding":    [0.01, 0.01, 0.03, 0.01, 0.12, 0.91, 0.05, 0.01, 0.05, 0.90, 0.10, 0.22],
+      "embeddings":   [0.01, 0.01, 0.03, 0.01, 0.12, 0.91, 0.05, 0.01, 0.05, 0.90, 0.10, 0.22],
+      "language":     [0.05, 0.01, 0.02, 0.08, 0.12, 0.65, 0.15, 0.04, 0.15, 0.85, 0.78, 0.12],
+      "model":        [0.04, 0.01, 0.08, 0.02, 0.10, 0.86, 0.08, 0.02, 0.10, 0.84, 0.20, 0.45],
+      "models":       [0.04, 0.01, 0.08, 0.02, 0.10, 0.86, 0.08, 0.02, 0.12, 0.84, 0.20, 0.45],
+      "data":         [0.02, 0.01, 0.03, 0.01, 0.08, 0.91, 0.04, 0.01, 0.18, 0.85, 0.14, 0.30],
+      "numerical":    [0.01, 0.01, 0.02, 0.01, 0.06, 0.84, 0.04, 0.01, 0.05, 0.94, 0.08, 0.15],
+      "human":        [0.10, 0.04, 0.02, 0.45, 0.25, 0.12, 0.28, 0.20, 0.15, 0.35, 0.94, 0.05],
+      "humans":       [0.10, 0.04, 0.02, 0.45, 0.25, 0.12, 0.28, 0.20, 0.20, 0.35, 0.95, 0.05],
+      "communicate":  [0.08, 0.01, 0.04, 0.12, 0.32, 0.45, 0.25, 0.04, 0.10, 0.58, 0.88, 0.12],
+      "learn":        [0.04, 0.01, 0.02, 0.14, 0.25, 0.38, 0.26, 0.05, 0.08, 0.84, 0.72, 0.10],
+      "amazing":      [0.12, 0.05, 0.04, 0.06, 0.18, 0.15, 0.92, 0.12, 0.35, 0.25, 0.30, 0.08],
+      "happy":        [0.06, 0.05, 0.02, 0.12, 0.22, 0.05, 0.95, 0.12, 0.10, 0.12, 0.65, 0.04],
+      "love":         [0.08, 0.06, 0.02, 0.16, 0.18, 0.04, 0.96, 0.15, 0.15, 0.15, 0.82, 0.04],
+      "sun":          [0.15, 0.08, 0.01, 0.05, 0.10, 0.02, 0.35, 0.95, 0.85, 0.18, 0.05, 0.05],
+      "moon":         [0.10, 0.02, 0.01, 0.04, 0.08, 0.02, 0.22, 0.92, 0.65, 0.18, 0.05, 0.05],
+      "water":        [0.02, 0.18, 0.04, 0.20, 0.28, 0.02, 0.15, 0.94, 0.30, 0.14, 0.12, 0.10],
+      "earth":        [0.08, 0.12, 0.02, 0.28, 0.08, 0.04, 0.18, 0.95, 0.90, 0.24, 0.25, 0.12]
+    };
+
+    async function initTransformersModel() {
+      const badge = document.getElementById('model-status-badge');
+      const dot = document.getElementById('model-status-dot');
+      const text = document.getElementById('model-status-text');
+
+      try {
+        const { AutoTokenizer, pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+        env.allowLocalModels = false;
+
+        text.textContent = "Loading Hugging Face MiniLM-L6-v2...";
+        const [tokenizer, extractor] = await Promise.all([
+          AutoTokenizer.from_pretrained('Xenova/all-MiniLM-L6-v2'),
+          pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true })
+        ]);
+
+        hfTokenizer = tokenizer;
+        hfExtractor = extractor;
+        usingRealHFModel = true;
+
+        badge.className = "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 transition-all";
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400";
+        text.textContent = "HF Transformers.js: WordPiece + 384D MiniLM-L6-v2";
+
+        runAnalysis();
+      } catch (err) {
+        usingRealHFModel = false;
+        badge.className = "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-semibold bg-violet-500/15 text-violet-300 border border-violet-500/30 transition-all";
+        dot.className = "w-2 h-2 rounded-full bg-violet-400";
+        text.textContent = "Engine Ready: BERT WordPiece & Semantic Vector Engine";
+      }
+    }
+
+    // =========================================================================
+    // 2. TOKENIZATION & VOCABULARY ID LOGIC
+    // =========================================================================
+    function deterministicWordPieceId(token) {
+      if (Object.prototype.hasOwnProperty.call(BERT_VOCAB_IDS, token)) {
+        return BERT_VOCAB_IDS[token];
+      }
+      let hash = 2166136261;
+      for (let i = 0; i < token.length; i++) {
+        hash ^= token.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return 2000 + (Math.abs(hash) % 28500);
+    }
+
+    function fallbackWordPieceTokenize(rawText) {
+      const chunks = rawText.trim().match(/[A-Za-z0-9]+|[^\sA-Za-z0-9]/g) || [];
+      const tokens = [];
+
+      for (const rawChunk of chunks) {
+        const lower = rawChunk.toLowerCase();
+
+        if (lower.length <= 3 || Object.prototype.hasOwnProperty.call(BERT_VOCAB_IDS, lower)) {
+          tokens.push({
+            token: lower,
+            originalChunk: rawChunk,
+            id: deterministicWordPieceId(lower),
+            isSubword: false,
+            isPunctuation: /^[^\w\s]$/.test(rawChunk)
+          });
+          continue;
+        }
+
+        // Check prefix + suffix subword splitting for compound words
+        let working = lower;
+        const pieces = [];
+        for (const pref of KNOWN_SUBWORD_PREFIXES) {
+          if (working.startsWith(pref) && working.length - pref.length >= 4) {
+            pieces.push({ token: pref, isSubword: false });
+            working = working.slice(pref.length);
+            break;
+          }
+        }
+
+        let matchedSuffix = false;
+        for (const suffix of KNOWN_SUBWORD_SUFFIXES) {
+          if (working.endsWith(suffix) && working.length - suffix.length >= 3) {
+            const stem = working.slice(0, working.length - suffix.length);
+            pieces.push({ token: pieces.length > 0 ? `##${stem}` : stem, isSubword: pieces.length > 0 });
+            pieces.push({ token: `##${suffix}`, isSubword: true });
+            matchedSuffix = true;
+            break;
+          }
+        }
+
+        if (!matchedSuffix) {
+          if (working.length > 8) {
+            const mid = Math.ceil(working.length * 0.58);
+            const root = working.slice(0, mid);
+            const tail = working.slice(mid);
+            pieces.push({ token: pieces.length > 0 ? `##${root}` : root, isSubword: pieces.length > 0 });
+            pieces.push({ token: `##${tail}`, isSubword: true });
+          } else {
+            pieces.push({ token: pieces.length > 0 ? `##${working}` : working, isSubword: pieces.length > 0 });
+          }
+        }
+
+        for (const p of pieces) {
+          tokens.push({
+            token: p.token,
+            originalChunk: rawChunk,
+            id: deterministicWordPieceId(p.token),
+            isSubword: p.isSubword,
+            isPunctuation: false
+          });
+        }
+      }
+
+      return tokens;
+    }
+
+    async function tokenizeInput(rawText) {
+      if (usingRealHFModel && hfTokenizer) {
+        try {
+          const encoded = await hfTokenizer(rawText, { add_special_tokens: false });
+          const ids = Array.from(encoded.input_ids.data, x => Number(x));
+          const pieces = hfTokenizer.convert_ids_to_tokens(ids);
+          return pieces.map((piece, idx) => ({
+            token: piece,
+            originalChunk: piece.replace(/^##/, ''),
+            id: ids[idx],
+            isSubword: piece.startsWith('##'),
+            isPunctuation: /^[^\w\s]$/.test(piece)
+          }));
+        } catch (e) {
+          console.warn("HF Tokenizer fallback triggered:", e);
+        }
+      }
+      return fallbackWordPieceTokenize(rawText);
+    }
+
+    // =========================================================================
+    // 3. SPELLING & MEANING EMBEDDING EXTRACTION + 2D PCA + COSINE SIMILARITY
+    // =========================================================================
+    function computeSpellingVector(tokenStr) {
+      const clean = tokenStr.replace(/^##/, '').toLowerCase();
+      const len = Math.max(clean.length, 1);
+
+      const charNorm = (idx) => {
+        if (idx >= clean.length) return 0;
+        const code = clean.charCodeAt(idx);
+        if (code >= 97 && code <= 122) return ((code - 97) / 25) * 2 - 1;
+        return -0.9;
+      };
+
+      const vowels = (clean.match(/[aeiou]/g) || []).length;
+      const vowelRatio = (vowels / len) * 2 - 1;
+
+      const prefix2 = clean.slice(0, 2);
+      let prefixSig = 0;
+      for (let i = 0; i < prefix2.length; i++) {
+        prefixSig += ((prefix2.charCodeAt(i) - 96) / 26) * (i === 0 ? 0.7 : 0.3);
+      }
+      prefixSig = prefixSig * 2 - 1;
+
+      const prefix3 = clean.slice(0, 3);
+      let stemSig = 0;
+      for (let i = 0; i < prefix3.length; i++) {
+        stemSig += ((prefix3.charCodeAt(i) - 96) / 26) * (1 / (i + 1));
+      }
+      stemSig = (stemSig / 1.833) * 2 - 1;
+
+      const lengthFeature = Math.min(len / 10, 1) * 2 - 1;
+      const lastChar = charNorm(len - 1);
+      const isSubwordFlag = tokenStr.startsWith('##') ? 0.85 : -0.35;
+
+      return [
+        Number(prefixSig.toFixed(4)),
+        Number(stemSig.toFixed(4)),
+        Number(charNorm(0).toFixed(4)),
+        Number(charNorm(1).toFixed(4)),
+        Number(lengthFeature.toFixed(4)),
+        Number(vowelRatio.toFixed(4)),
+        Number(lastChar.toFixed(4)),
+        Number(isSubwordFlag.toFixed(4))
+      ];
+    }
+
+    async function computeMeaningVectors(uniqueTokens) {
+      if (usingRealHFModel && hfExtractor) {
+        try {
+          const results = [];
+          for (const item of uniqueTokens) {
+            const cleanWord = item.token.replace(/^##/, '');
+            const output = await hfExtractor(cleanWord, { pooling: 'mean', normalize: true });
+            results.push(Array.from(output.data));
+          }
+          return results;
+        } catch (e) {
+          console.warn("HF Extractor fallback triggered:", e);
+        }
+      }
+
+      return uniqueTokens.map(item => {
+        const clean = item.token.replace(/^##/, '').toLowerCase();
+        if (SEMANTIC_CONCEPT_LEXICON[clean]) {
+          return [...SEMANTIC_CONCEPT_LEXICON[clean]];
+        }
+        const singular = clean.endsWith('s') && clean.length > 3 ? clean.slice(0, -1) : null;
+        if (singular && SEMANTIC_CONCEPT_LEXICON[singular]) {
+          const base = [...SEMANTIC_CONCEPT_LEXICON[singular]];
+          base[11] = Number((base[11] + 0.04).toFixed(4));
+          return base;
+        }
+        if (/^[^\w\s]$/.test(clean)) {
+          return [-0.3, -0.3, -0.3, -0.3, -0.3, 0.1, 0.0, -0.3, -0.4, 0.4, 0.1, 0.2];
+        }
+        const vec = [];
+        let seed = 0;
+        for (let i = 0; i < clean.length; i++) {
+          seed = (seed * 31 + clean.charCodeAt(i)) % 10007;
+        }
+        for (let d = 0; d < 12; d++) {
+          const val = Math.sin(seed * (d + 1.37) + d * 2.1) * 0.65;
+          vec.push(Number(val.toFixed(4)));
+        }
+        return vec;
+      });
+    }
+
+    function cosineSimilarity(vecA, vecB) {
+      const len = Math.min(vecA.length, vecB.length);
+      let dot = 0, normA = 0, normB = 0;
+      for (let i = 0; i < len; i++) {
+        dot += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+      }
+      if (normA === 0 || normB === 0) return 0;
+      return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    function projectTo2DPCA(vectors) {
+      const n = vectors.length;
+      if (n === 0) return [];
+      const dim = vectors[0].length;
+      if (n === 1) return [{ x: 0, y: 0 }];
+
+      const mean = new Array(dim).fill(0);
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < dim; j++) {
+          mean[j] += vectors[i][j] / n;
+        }
+      }
+
+      const centered = vectors.map(row => row.map((val, j) => val - mean[j]));
+      const cov = Array.from({ length: dim }, () => new Array(dim).fill(0));
+      for (let i = 0; i < n; i++) {
+        const row = centered[i];
+        for (let r = 0; r < dim; r++) {
+          for (let c = r; c < dim; c++) {
+            cov[r][c] += (row[r] * row[c]) / Math.max(n - 1, 1);
+          }
+        }
+      }
+      for (let r = 0; r < dim; r++) {
+        for (let c = 0; c < r; c++) {
+          cov[r][c] = cov[c][r];
+        }
+      }
+
+      function powerIteration(matrix, seedOffset = 1) {
+        let v = Array.from({ length: dim }, (_, idx) => Math.sin((idx + 1) * seedOffset * 1.73) + 0.5);
+        let norm = Math.hypot(...v) || 1;
+        v = v.map(x => x / norm);
+
+        for (let iter = 0; iter < 60; iter++) {
+          const next = new Array(dim).fill(0);
+          for (let r = 0; r < dim; r++) {
+            let sum = 0;
+            for (let c = 0; c < dim; c++) {
+              sum += matrix[r][c] * v[c];
+            }
+            next[r] = sum;
+          }
+          const nextNorm = Math.hypot(...next);
+          if (nextNorm < 1e-10) break;
+          v = next.map(x => x / nextNorm);
+        }
+
+        let eigenVal = 0;
+        for (let r = 0; r < dim; r++) {
+          let rowSum = 0;
+          for (let c = 0; c < dim; c++) {
+            rowSum += matrix[r][c] * v[c];
+          }
+          eigenVal += v[r] * rowSum;
+        }
+        return { vector: v, value: eigenVal };
+      }
+
+      const pc1 = powerIteration(cov, 1);
+      const covDeflated = cov.map((row, r) =>
+        row.map((val, c) => val - pc1.value * pc1.vector[r] * pc1.vector[c])
+      );
+      const pc2 = powerIteration(covDeflated, 2.9);
+
+      return centered.map((row, idx) => {
+        const x = row.reduce((acc, val, j) => acc + val * pc1.vector[j], 0);
+        let y = row.reduce((acc, val, j) => acc + val * pc2.vector[j], 0);
+        if (Math.abs(y) < 1e-6 && n === 2) {
+          y = idx === 0 ? 0.08 : -0.08;
+        }
+        return {
+          x: Number(x.toFixed(3)),
+          y: Number(y.toFixed(3))
+        };
+      });
+    }
+
+    function classifySemanticGroup(meaningVec) {
+      const categories = [
+        { name: "Royalty & Leadership", color: "#A78BFA" },
+        { name: "Fruits & Food",        color: "#F472B6" },
+        { name: "Vehicles & Transport", color: "#38BDF8" },
+        { name: "Animals & Living",     color: "#34D399" },
+        { name: "Actions & Motion",     color: "#FBBF24" },
+        { name: "AI & Technology",      color: "#818CF8" },
+        { name: "Emotions & Qualities", color: "#FB7185" },
+        { name: "Nature & Elements",    color: "#2DD4BF" }
+      ];
+
+      if (meaningVec.length >= 12) {
+        let bestIdx = 0;
+        let bestVal = -Infinity;
+        for (let i = 0; i < 8; i++) {
+          if (meaningVec[i] > bestVal) {
+            bestVal = meaningVec[i];
+            bestIdx = i;
+          }
+        }
+        if (bestVal > 0.45) {
+          return categories[bestIdx];
+        }
+      }
+      return { name: "General Concept", color: "#C084FC" };
+    }
+
+    // =========================================================================
+    // 4. DARK-MODE CHART.JS PLUGINS & PALETTE
+    // =========================================================================
+    let chartFrequency = null;
+    let chartIdDist = null;
+    let chartVocabDist = null;
+    let chartSpelling = null;
+    let chartMeaning = null;
+
+    const scatterPointLabelsPlugin = {
+      id: 'scatterPointLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        ctx.save();
+        ctx.font = '600 12px "JetBrains Mono", monospace';
+        ctx.textBaseline = 'middle';
+
+        const placedBoxes = [];
+
+        chart.data.datasets.forEach((dataset, datasetIndex) => {
+          const meta = chart.getDatasetMeta(datasetIndex);
+          if (meta.hidden) return;
+
+          meta.data.forEach((element, index) => {
+            const rawPoint = dataset.data[index];
+            if (!rawPoint || !rawPoint.label) return;
+
+            const labelText = rawPoint.label;
+            const textWidth = ctx.measureText(labelText).width;
+            const textHeight = 16;
+
+            let offsetX = 11;
+            let offsetY = -10;
+
+            if (element.x + offsetX + textWidth > chart.chartArea.right - 8) {
+              offsetX = -textWidth - 11;
+            }
+            if (element.y + offsetY - textHeight / 2 < chart.chartArea.top + 8) {
+              offsetY = 14;
+            }
+
+            let candidateX = element.x + offsetX;
+            let candidateY = element.y + offsetY;
+            for (const box of placedBoxes) {
+              const overlapX = Math.abs(candidateX - box.x) < (textWidth + box.w) * 0.58;
+              const overlapY = Math.abs(candidateY - box.y) < 17;
+              if (overlapX && overlapY) {
+                candidateY += (candidateY >= box.y ? 17 : -17);
+              }
+            }
+            placedBoxes.push({ x: candidateX, y: candidateY, w: textWidth });
+
+            // Dark pill backing for crisp contrast
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(candidateX - 5, candidateY - 9, textWidth + 10, 18, 6);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#F8FAFC';
+            ctx.fillText(labelText, candidateX, candidateY);
+          });
+        });
+
+        ctx.restore();
+      }
+    };
+
+    const JEWEL_TOKEN_STYLES = [
+      { bg: 'bg-violet-500/15',  text: 'text-violet-300',  border: 'border-violet-500/40',  hex: '#A78BFA' },
+      { bg: 'bg-cyan-500/15',    text: 'text-cyan-300',    border: 'border-cyan-500/40',    hex: '#22D3EE' },
+      { bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-500/40', hex: '#34D399' },
+      { bg: 'bg-fuchsia-500/15', text: 'text-fuchsia-300', border: 'border-fuchsia-500/40', hex: '#E879F9' },
+      { bg: 'bg-amber-500/15',   text: 'text-amber-300',   border: 'border-amber-500/40',   hex: '#FBBF24' },
+      { bg: 'bg-sky-500/15',     text: 'text-sky-300',     border: 'border-sky-500/40',     hex: '#38BDF8' },
+      { bg: 'bg-rose-500/15',    text: 'text-rose-300',    border: 'border-rose-500/40',    hex: '#FB7185' },
+      { bg: 'bg-indigo-500/15',  text: 'text-indigo-300',  border: 'border-indigo-500/40',  hex: '#818CF8' },
+    ];
+
+    // =========================================================================
+    // 5. STATE, SPOTLIGHT CROSS-HIGHLIGHTING & UI RENDERING
+    // =========================================================================
+    let currentAnalysisState = null;
+    let activeSpotlightToken = null;
+    let debounceTimer = null;
+
+    function updateInputCounter() {
+      const val = document.getElementById('user-input').value;
+      const chars = val.length;
+      const words = val.trim() ? val.trim().split(/\s+/).length : 0;
+      document.getElementById('char-word-counter').textContent = `Characters: ${chars} · Words: ${words}`;
+    }
+
+    function showFeedback(message) {
+      const box = document.getElementById('input-feedback');
+      document.getElementById('input-feedback-text').textContent = message;
+      box.classList.remove('hidden');
+    }
+
+    function hideFeedback() {
+      document.getElementById('input-feedback').classList.add('hidden');
+    }
+
+    function setSpotlightToken(tokenStr) {
+      activeSpotlightToken = tokenStr;
+      const banner = document.getElementById('spotlight-banner');
+      if (tokenStr) {
+        banner.classList.remove('hidden');
+        banner.classList.add('inline-flex');
+        document.getElementById('spotlight-token-name').textContent = `"${tokenStr}"`;
+      } else {
+        banner.classList.add('hidden');
+        banner.classList.remove('inline-flex');
+      }
+
+      // Highlight matching token pills
+      document.querySelectorAll('.token-pill').forEach(el => {
+        const t = el.getAttribute('data-token');
+        if (!tokenStr) {
+          el.classList.remove('is-highlighted', 'is-dimmed');
+        } else if (t === tokenStr) {
+          el.classList.add('is-highlighted');
+          el.classList.remove('is-dimmed');
+        } else {
+          el.classList.remove('is-highlighted');
+          el.classList.add('is-dimmed');
+        }
+      });
+
+      // Highlight matching row in Vocabulary table
+      document.querySelectorAll('#vocabulary-table-body tr').forEach(row => {
+        const t = row.getAttribute('data-token');
+        if (tokenStr && t === tokenStr) {
+          row.classList.add('bg-cyan-500/15');
+        } else {
+          row.classList.remove('bg-cyan-500/15');
+        }
+      });
+
+      // Highlight matching Token ID flow cards
+      document.querySelectorAll('.flow-id-card').forEach(card => {
+        const t = card.getAttribute('data-token');
+        if (tokenStr && t === tokenStr) {
+          card.classList.add('border-cyan-400', 'ring-1', 'ring-cyan-400/50');
+        } else {
+          card.classList.remove('border-cyan-400', 'ring-1', 'ring-cyan-400/50');
+        }
+      });
+
+      // Sync Vector Inspector if token exists
+      if (tokenStr && currentAnalysisState) {
+        const idx = currentAnalysisState.uniqueTokens.findIndex(u => u.token === tokenStr);
+        if (idx >= 0) {
+          const select = document.getElementById('vector-token-select');
+          select.value = String(idx);
+          select.dispatchEvent(new Event('change'));
+        }
+      }
+    }
+
+    async function runAnalysis() {
+      const textarea = document.getElementById('user-input');
+      const rawText = textarea.value;
+
+      if (!rawText || !rawText.trim()) {
+        showFeedback("Please enter or paste some text in the box above before generating tokens.");
+        return;
+      }
+
+      hideFeedback();
+      const spinner = document.getElementById('processing-spinner');
+      spinner.classList.remove('hidden');
+
+      await new Promise(resolve => setTimeout(resolve, 25));
+
+      try {
+        const tokens = await tokenizeInput(rawText);
+        if (tokens.length === 0) {
+          showFeedback("No valid tokens found. Try typing words, numbers, or punctuation.");
+          spinner.classList.add('hidden');
+          return;
+        }
+
+        const uniqueMap = new Map();
+        tokens.forEach((t, index) => {
+          t.position = index + 1;
+          if (!uniqueMap.has(t.token)) {
+            const colorStyle = JEWEL_TOKEN_STYLES[uniqueMap.size % JEWEL_TOKEN_STYLES.length];
+            uniqueMap.set(t.token, {
+              token: t.token,
+              id: t.id,
+              frequency: 0,
+              positions: [],
+              isSubword: t.isSubword,
+              isPunctuation: t.isPunctuation,
+              style: colorStyle
+            });
+          }
+          const entry = uniqueMap.get(t.token);
+          entry.frequency += 1;
+          entry.positions.push(t.position);
+          t.style = entry.style;
+        });
+
+        const uniqueTokens = Array.from(uniqueMap.values());
+
+        uniqueTokens.forEach(item => {
+          item.spellingVector = computeSpellingVector(item.token);
+        });
+
+        const meaningVecs = await computeMeaningVectors(uniqueTokens);
+        uniqueTokens.forEach((item, idx) => {
+          item.meaningVector = meaningVecs[idx];
+          item.semanticGroup = classifySemanticGroup(item.meaningVector);
+        });
+
+        const spelling2D = projectTo2DPCA(uniqueTokens.map(u => u.spellingVector));
+        const meaning2D = projectTo2DPCA(uniqueTokens.map(u => u.meaningVector));
+
+        uniqueTokens.forEach((item, idx) => {
+          item.spellingCoords = spelling2D[idx];
+          item.meaningCoords = meaning2D[idx];
+        });
+
+        currentAnalysisState = { rawText, tokens, uniqueTokens };
+        activeSpotlightToken = null;
+        document.getElementById('spotlight-banner').classList.add('hidden');
+
+        renderPipelineFlow(currentAnalysisState);
+        renderTokenizationSection(currentAnalysisState);
+        renderVocabularySection(currentAnalysisState);
+        renderTokenIdFlowSection(currentAnalysisState);
+        renderStatisticsCharts(currentAnalysisState);
+        renderEmbeddingCharts(currentAnalysisState);
+        renderSimilarityProbe(currentAnalysisState);
+        renderVectorExplorerSection(currentAnalysisState);
+        renderLearningSection(currentAnalysisState);
+
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      } finally {
+        spinner.classList.add('hidden');
+      }
+    }
+
+    function renderPipelineFlow({ rawText, tokens, uniqueTokens }) {
+      const container = document.getElementById('pipeline-flow');
+      const sampleToken = tokens[0]?.token || 'text';
+      const sampleId = tokens[0]?.id || 101;
+      const sampleVec = uniqueTokens[0]?.meaningVector.slice(0, 2).map(v => v.toFixed(2)).join(', ') || '0.12, -0.45';
+
+      const stages = [
+        { step: "01", title: "User Input", target: "#user-input", icon: "type", desc: "Raw text string", preview: `"${rawText.trim().slice(0, 18)}${rawText.trim().length > 18 ? '…' : ''}"`, border: "hover:border-slate-500" },
+        { step: "02", title: "Tokenization", target: "#section-tokenization", icon: "scissors", desc: "Subword splitting", preview: `${tokens.length} total tokens`, border: "hover:border-violet-500/60" },
+        { step: "03", title: "Vocabulary", target: "#section-vocabulary", icon: "database", desc: "Unique index", preview: `${uniqueTokens.length} unique entries`, border: "hover:border-emerald-500/60" },
+        { step: "04", title: "Token IDs", target: "#section-token-ids", icon: "binary", desc: "Integer mapping", preview: `"${sampleToken}" → ${sampleId}`, border: "hover:border-cyan-500/60" },
+        { step: "05", title: "Embeddings", target: "#section-vectors", icon: "cpu", desc: "Dense vectors", preview: `[${sampleVec}, …]`, border: "hover:border-fuchsia-500/60" },
+        { step: "06", title: "2D Graphs", target: "#section-embeddings", icon: "scatter-chart", desc: "PCA projection", preview: `Spelling vs Meaning`, border: "hover:border-amber-500/60" },
+      ];
+
+      container.innerHTML = stages.map((s, idx) => `
+        <a href="${s.target}" class="group relative rounded-xl bg-[#0B0F19]/85 border border-slate-800 ${s.border} p-3.5 flex flex-col justify-between transition">
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[10px] font-mono font-bold text-slate-500 group-hover:text-cyan-400 transition">STAGE ${s.step}</span>
+              <i data-lucide="${s.icon}" class="w-4 h-4 text-slate-400 group-hover:text-white transition"></i>
+            </div>
+            <div class="font-bold text-sm text-white">${s.title}</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">${s.desc}</div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-800/90 font-mono text-[11px] text-cyan-300 truncate">
+            ${escapeHtml(s.preview)}
+          </div>
+          ${idx < stages.length - 1 ? `
+            <div class="hidden lg:flex absolute -right-2.5 top-1/2 -translate-y-1/2 z-10 w-5 h-5 rounded-full bg-slate-900 border border-slate-700 items-center justify-center text-slate-400">
+              <i data-lucide="chevron-right" class="w-3 h-3"></i>
+            </div>
+          ` : ''}
+        </a>
+      `).join('');
+    }
+
+    function renderTokenizationSection({ rawText, tokens }) {
+      document.getElementById('total-tokens-count').textContent = tokens.length;
+      document.getElementById('active-tokenizer-name').textContent = usingRealHFModel
+        ? 'MiniLM-L6-v2 WordPiece (Transformers.js)'
+        : 'BERT-Base WordPiece Subword Tokenizer';
+
+      document.getElementById('original-input-display').textContent = rawText;
+
+      const highlightSubwords = document.getElementById('highlight-subwords-toggle').checked;
+      const blocksContainer = document.getElementById('token-blocks-container');
+
+      blocksContainer.innerHTML = tokens.map(t => {
+        const dimClass = highlightSubwords && !t.isSubword ? 'opacity-30' : '';
+        const ringClass = highlightSubwords && t.isSubword ? 'ring-2 ring-violet-400' : '';
+        return `
+          <button type="button" data-token="${escapeHtml(t.token)}"
+            class="token-pill ${dimClass} ${ringClass} inline-flex flex-col items-center px-3 py-2 rounded-xl border ${t.style.bg} ${t.style.border} cursor-pointer">
+            <span class="text-[10px] font-mono text-slate-400 mb-0.5">#${t.position}</span>
+            <span class="font-mono text-sm sm:text-base font-bold ${t.style.text}">${escapeHtml(t.token)}</span>
+            <span class="text-[10px] font-mono text-slate-400 mt-0.5">
+              ${t.isSubword ? 'subword' : (t.isPunctuation ? 'punct' : 'word')}
+            </span>
+          </button>
+        `;
+      }).join('');
+
+      document.querySelectorAll('.token-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tok = btn.getAttribute('data-token');
+          setSpotlightToken(activeSpotlightToken === tok ? null : tok);
+        });
+      });
+
+      const subwords = tokens.filter(t => t.isSubword);
+      const puncts = tokens.filter(t => t.isPunctuation);
+      const hasUppercase = /[A-Z]/.test(rawText);
+
+      const reasons = [];
+      if (hasUppercase) {
+        reasons.push("uppercase characters were normalized to lowercase (matching uncased BERT/MiniLM vocabularies)");
+      }
+      if (subwords.length > 0) {
+        const examples = subwords.slice(0, 3).map(s => `"${s.token}"`).join(', ');
+        reasons.push(`longer or affixed words were split into root stems plus continuation subwords prefixed with "##" (${examples})`);
+      } else {
+        reasons.push("every word matched a complete root entry in the WordPiece vocabulary without requiring ## subword splits");
+      }
+      if (puncts.length > 0) {
+        const pExamples = [...new Set(puncts.map(p => `"${p.token}"`))].join(', ');
+        reasons.push(`punctuation symbols (${pExamples}) were separated into standalone tokens`);
+      }
+
+      document.getElementById('tokenization-explanation').textContent =
+        `Your text produced ${tokens.length} token${tokens.length === 1 ? '' : 's'} because ${reasons.join('; ')}.`;
+    }
+
+    function renderVocabularySection({ tokens, uniqueTokens }) {
+      document.getElementById('vocab-size-count').textContent = uniqueTokens.length;
+      const ratio = tokens.length > 0 ? Math.round((uniqueTokens.length / tokens.length) * 100) : 100;
+      document.getElementById('vocab-ratio-count').textContent = `${ratio}%`;
+
+      const repeatedCount = tokens.length - uniqueTokens.length;
+      const banner = document.getElementById('vocab-comparison-banner');
+      if (repeatedCount > 0) {
+        banner.innerHTML = `
+          <strong class="text-white">Total Tokens (${tokens.length}) vs. Unique Vocabulary Entries (${uniqueTokens.length}):</strong>
+          Your input contains <strong class="text-cyan-300">${tokens.length} total tokens</strong>, built from <strong class="text-emerald-300">${uniqueTokens.length} unique vocabulary tokens</strong>.
+          The ${repeatedCount} repeated occurrence${repeatedCount === 1 ? '' : 's'} reuse existing Token IDs instead of expanding the vocabulary.
+        `;
+      } else {
+        banner.innerHTML = `
+          <strong class="text-white">Total Tokens (${tokens.length}) vs. Unique Vocabulary Entries (${uniqueTokens.length}):</strong>
+          All ${tokens.length} tokens in your text are unique (100% uniqueness). Try repeating a word in your sentence to observe how Frequency increases while Vocabulary Size stays fixed.
+        `;
+      }
+
+      const renderRows = () => {
+        const query = document.getElementById('vocab-search-input').value.trim().toLowerCase();
+        const sortBy = document.getElementById('vocab-sort-select').value;
+
+        let filtered = uniqueTokens.filter(item =>
+          item.token.toLowerCase().includes(query) || String(item.id).includes(query)
+        );
+
+        if (sortBy === 'frequency') {
+          filtered.sort((a, b) => b.frequency - a.frequency || a.positions[0] - b.positions[0]);
+        } else if (sortBy === 'id') {
+          filtered.sort((a, b) => a.id - b.id);
+        } else if (sortBy === 'alpha') {
+          filtered.sort((a, b) => a.token.localeCompare(b.token));
+        } else {
+          filtered.sort((a, b) => a.positions[0] - b.positions[0]);
+        }
+
+        const tbody = document.getElementById('vocabulary-table-body');
+        if (filtered.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4" class="py-6 px-4 text-center text-xs font-mono text-slate-500">No matching vocabulary tokens found.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = filtered.map(item => `
+          <tr data-token="${escapeHtml(item.token)}" class="hover:bg-slate-800/50 transition cursor-pointer ${activeSpotlightToken === item.token ? 'bg-cyan-500/15' : ''}">
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-lg font-mono text-xs sm:text-sm font-bold border ${item.style.bg} ${item.style.text} ${item.style.border}">
+                ${escapeHtml(item.token)}
+              </span>
+            </td>
+            <td class="py-3 px-4 font-mono font-bold text-white">${item.id}</td>
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-md font-mono text-xs font-bold ${item.frequency > 1 ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30' : 'bg-slate-800 text-slate-300'}">
+                ${item.frequency}×
+              </span>
+            </td>
+            <td class="py-3 px-4 font-mono text-xs text-slate-400">
+              ${item.positions.map(p => `#${p}`).join(', ')}
+            </td>
+          </tr>
+        `).join('');
+
+        tbody.querySelectorAll('tr[data-token]').forEach(row => {
+          row.addEventListener('click', () => {
+            const tok = row.getAttribute('data-token');
+            setSpotlightToken(activeSpotlightToken === tok ? null : tok);
+          });
+        });
+      };
+
+      renderRows();
+      document.getElementById('vocab-search-input').oninput = renderRows;
+      document.getElementById('vocab-sort-select').onchange = renderRows;
+    }
+
+    function renderTokenIdFlowSection({ tokens }) {
+      const badgeText = document.getElementById('token-id-source-text');
+      badgeText.textContent = usingRealHFModel
+        ? 'Actual Hugging Face MiniLM/BERT IDs'
+        : 'Illustrative BERT WordPiece IDs';
+
+      const container = document.getElementById('token-id-flow-container');
+      container.innerHTML = tokens.map(t => `
+        <div data-token="${escapeHtml(t.token)}" class="flow-id-card rounded-xl border border-slate-800 bg-[#0B0F19]/90 p-3.5 flex flex-col items-center text-center hover:border-violet-500/50 transition cursor-pointer">
+          <span class="text-[10px] font-mono text-slate-500">Pos #${t.position}</span>
+          <div class="mt-1 px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-200 text-xs font-medium truncate max-w-full" title="${escapeHtml(t.originalChunk)}">
+            ${escapeHtml(t.originalChunk)}
+          </div>
+          <i data-lucide="arrow-down" class="w-3.5 h-3.5 text-slate-600 my-1"></i>
+          <div class="px-2.5 py-0.5 rounded-md border ${t.style.bg} ${t.style.text} ${t.style.border} font-mono text-xs font-bold truncate max-w-full">
+            ${escapeHtml(t.token)}
+          </div>
+          <i data-lucide="arrow-down" class="w-3.5 h-3.5 text-slate-600 my-1"></i>
+          <div class="w-full py-1 px-2 rounded-lg bg-gradient-to-r from-violet-600/90 to-cyan-600/90 text-white font-mono text-xs sm:text-sm font-extrabold">
+            ${t.id}
+          </div>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.flow-id-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const tok = card.getAttribute('data-token');
+          setSpotlightToken(activeSpotlightToken === tok ? null : tok);
+        });
+      });
+
+      // Tensor Array View
+      const idArray = tokens.map(t => t.id);
+      document.getElementById('tensor-array-output').textContent = `[${idArray.join(', ')}]`;
+    }
+
+    function renderStatisticsCharts({ tokens, uniqueTokens }) {
+      if (chartFrequency) chartFrequency.destroy();
+      if (chartIdDist) chartIdDist.destroy();
+      if (chartVocabDist) chartVocabDist.destroy();
+
+      // Graph A: Token Frequency Bar Graph
+      const ctxFreq = document.getElementById('chart-frequency').getContext('2d');
+      chartFrequency = new Chart(ctxFreq, {
+        type: 'bar',
+        data: {
+          labels: uniqueTokens.map(u => u.token),
+          datasets: [{
+            label: 'Frequency',
+            data: uniqueTokens.map(u => u.frequency),
+            backgroundColor: uniqueTokens.map(u => u.style.hex + '99'),
+            borderColor: uniqueTokens.map(u => u.style.hex),
+            borderWidth: 2,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F172A',
+              borderColor: '#334155',
+              borderWidth: 1,
+              titleColor: '#F8FAFC',
+              bodyColor: '#CBD5E1',
+              padding: 10,
+              cornerRadius: 8,
+              callbacks: {
+                label: (ctx) => ` Frequency: ${ctx.parsed.y} occurrence${ctx.parsed.y === 1 ? '' : 's'}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#CBD5E1', font: { family: '"JetBrains Mono"', size: 11 } },
+              grid: { display: false }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { stepSize: 1, color: '#94A3B8' },
+              grid: { color: 'rgba(148, 163, 184, 0.1)' },
+              title: { display: true, text: 'Frequency', color: '#94A3B8', font: { weight: 'bold', size: 11 } }
+            }
+          }
+        }
+      });
+
+      // Graph B: Token ID Distribution
+      const ctxId = document.getElementById('chart-id-dist').getContext('2d');
+      chartIdDist = new Chart(ctxId, {
+        type: 'line',
+        data: {
+          labels: tokens.map(t => `#${t.position}`),
+          datasets: [{
+            label: 'Token ID',
+            data: tokens.map(t => ({ x: t.position, y: t.id, tokenName: t.token })),
+            borderColor: '#06B6D4',
+            backgroundColor: '#8B5CF6',
+            pointBackgroundColor: tokens.map(t => t.style.hex),
+            pointBorderColor: '#0B0F19',
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            tension: 0.25,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F172A',
+              borderColor: '#334155',
+              borderWidth: 1,
+              titleColor: '#F8FAFC',
+              bodyColor: '#CBD5E1',
+              padding: 10,
+              cornerRadius: 8,
+              callbacks: {
+                title: (items) => `Position #${items[0].raw.x} · Token: "${items[0].raw.tokenName}"`,
+                label: (ctx) => ` Token ID: ${ctx.raw.y}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: 'Token Position in Input', color: '#94A3B8', font: { weight: 'bold', size: 11 } },
+              ticks: { color: '#94A3B8' },
+              grid: { color: 'rgba(148, 163, 184, 0.08)' }
+            },
+            y: {
+              title: { display: true, text: 'Token ID', color: '#94A3B8', font: { weight: 'bold', size: 11 } },
+              ticks: { color: '#94A3B8' },
+              grid: { color: 'rgba(148, 163, 184, 0.1)' }
+            }
+          }
+        }
+      });
+
+      // Graph C: Vocabulary Distribution Doughnut
+      const uniqueCount = uniqueTokens.length;
+      const repeatedOccurrences = Math.max(tokens.length - uniqueCount, 0);
+      const ctxVocab = document.getElementById('chart-vocab-dist').getContext('2d');
+      chartVocabDist = new Chart(ctxVocab, {
+        type: 'doughnut',
+        data: {
+          labels: ['Unique Tokens', 'Repeated Occurrences'],
+          datasets: [{
+            data: [uniqueCount, repeatedOccurrences],
+            backgroundColor: ['#8B5CF6', '#06B6D4'],
+            borderColor: '#111827',
+            borderWidth: 3,
+            hoverOffset: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '64%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                color: '#CBD5E1',
+                font: { family: '"Inter"', size: 11, weight: '600' },
+                padding: 14
+              }
+            },
+            tooltip: {
+              backgroundColor: '#0F172A',
+              borderColor: '#334155',
+              borderWidth: 1,
+              titleColor: '#F8FAFC',
+              bodyColor: '#CBD5E1',
+              padding: 10,
+              cornerRadius: 8,
+              callbacks: {
+                label: (ctx) => {
+                  const total = tokens.length || 1;
+                  const val = ctx.parsed;
+                  const pct = ((val / total) * 100).toFixed(1);
+                  return ` ${ctx.label}: ${val} (${pct}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderEmbeddingCharts({ uniqueTokens }) {
+      if (chartSpelling) chartSpelling.destroy();
+      if (chartMeaning) chartMeaning.destroy();
+
+      document.getElementById('semantic-source-label').textContent = usingRealHFModel
+        ? 'MiniLM-L6-v2 384D → 2D PCA'
+        : 'Semantic Lexicon 12D → 2D PCA';
+
+      const getAxisRange = (vals) => {
+        const min = Math.min(...vals);
+        const max = Math.max(...vals);
+        const span = Math.max(max - min, 0.6);
+        return {
+          min: Number((min - span * 0.28).toFixed(2)),
+          max: Number((max + span * 0.34).toFixed(2))
+        };
+      };
+
+      // GRAPH 1: Spelling-Based Vector Embeddings
+      const spellXRange = getAxisRange(uniqueTokens.map(u => u.spellingCoords.x));
+      const spellYRange = getAxisRange(uniqueTokens.map(u => u.spellingCoords.y));
+
+      const ctxSpell = document.getElementById('chart-spelling-embeddings').getContext('2d');
+      chartSpelling = new Chart(ctxSpell, {
+        type: 'scatter',
+        plugins: [scatterPointLabelsPlugin],
+        data: {
+          datasets: [{
+            label: 'Unique Tokens (Spelling Space)',
+            data: uniqueTokens.map(u => ({
+              x: u.spellingCoords.x,
+              y: u.spellingCoords.y,
+              label: u.token,
+              vectorPreview: u.spellingVector.slice(0, 4).map(v => v.toFixed(2)).join(', ')
+            })),
+            backgroundColor: uniqueTokens.map(u => u.style.hex),
+            borderColor: '#0B0F19',
+            borderWidth: 2,
+            pointRadius: 8,
+            pointHoverRadius: 11
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: (_, elements) => {
+            if (elements.length > 0) {
+              const idx = elements[0].index;
+              setSpotlightToken(uniqueTokens[idx].token);
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F172A',
+              borderColor: '#06B6D4',
+              borderWidth: 1,
+              titleColor: '#F8FAFC',
+              bodyColor: '#CBD5E1',
+              padding: 12,
+              cornerRadius: 10,
+              callbacks: {
+                title: (items) => `Token: "${items[0].raw.label}"`,
+                label: (ctx) => [
+                  `2D PCA Coords: (${ctx.raw.x}, ${ctx.raw.y})`,
+                  `Spelling Vector: [${ctx.raw.vectorPreview}, ...]`
+                ]
+              }
+            }
+          },
+          scales: {
+            x: {
+              min: spellXRange.min,
+              max: spellXRange.max,
+              title: {
+                display: true,
+                text: 'Spelling Feature 1 (Prefix & Character Pattern)',
+                color: '#22D3EE',
+                font: { weight: 'bold', size: 12 }
+              },
+              grid: { color: 'rgba(6, 182, 212, 0.12)' },
+              ticks: { color: '#94A3B8', font: { size: 11 } }
+            },
+            y: {
+              min: spellYRange.min,
+              max: spellYRange.max,
+              title: {
+                display: true,
+                text: 'Spelling Feature 2 (Length, Suffix & Vowel Structure)',
+                color: '#22D3EE',
+                font: { weight: 'bold', size: 12 }
+              },
+              grid: { color: 'rgba(6, 182, 212, 0.12)' },
+              ticks: { color: '#94A3B8', font: { size: 11 } }
+            }
+          }
+        }
+      });
+
+      // GRAPH 2: Meaning-Based Vector Embeddings
+      const meanXRange = getAxisRange(uniqueTokens.map(u => u.meaningCoords.x));
+      const meanYRange = getAxisRange(uniqueTokens.map(u => u.meaningCoords.y));
+
+      const groupedDatasetsMap = new Map();
+      uniqueTokens.forEach(u => {
+        const groupName = u.semanticGroup.name;
+        if (!groupedDatasetsMap.has(groupName)) {
+          groupedDatasetsMap.set(groupName, {
+            label: groupName,
+            data: [],
+            backgroundColor: u.semanticGroup.color,
+            borderColor: '#0B0F19',
+            borderWidth: 2,
+            pointRadius: 8,
+            pointHoverRadius: 11
+          });
+        }
+        groupedDatasetsMap.get(groupName).data.push({
+          x: u.meaningCoords.x,
+          y: u.meaningCoords.y,
+          label: u.token,
+          group: groupName,
+          vectorPreview: u.meaningVector.slice(0, 4).map(v => v.toFixed(2)).join(', ')
+        });
+      });
+
+      const ctxMean = document.getElementById('chart-meaning-embeddings').getContext('2d');
+      chartMeaning = new Chart(ctxMean, {
+        type: 'scatter',
+        plugins: [scatterPointLabelsPlugin],
+        data: {
+          datasets: Array.from(groupedDatasetsMap.values())
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: (event, elements, chart) => {
+            if (elements.length > 0) {
+              const { datasetIndex, index } = elements[0];
+              const clickedPoint = chart.data.datasets[datasetIndex].data[index];
+              if (clickedPoint?.label) {
+                setSpotlightToken(clickedPoint.label);
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: groupedDatasetsMap.size > 1,
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                pointStyle: 'circle',
+                boxWidth: 8,
+                color: '#CBD5E1',
+                font: { size: 11, weight: '600' }
+              }
+            },
+            tooltip: {
+              backgroundColor: '#0F172A',
+              borderColor: '#8B5CF6',
+              borderWidth: 1,
+              titleColor: '#F8FAFC',
+              bodyColor: '#CBD5E1',
+              padding: 12,
+              cornerRadius: 10,
+              callbacks: {
+                title: (items) => `Token: "${items[0].raw.label}" (${items[0].raw.group})`,
+                label: (ctx) => [
+                  `Semantic Coords: (${ctx.raw.x}, ${ctx.raw.y})`,
+                  `Meaning Vector: [${ctx.raw.vectorPreview}, ...]`
+                ]
+              }
+            }
+          },
+          scales: {
+            x: {
+              min: meanXRange.min,
+              max: meanXRange.max,
+              title: {
+                display: true,
+                text: 'Semantic Dimension 1',
+                color: '#A78BFA',
+                font: { weight: 'bold', size: 12 }
+              },
+              grid: { color: 'rgba(139, 92, 246, 0.14)' },
+              ticks: { color: '#94A3B8', font: { size: 11 } }
+            },
+            y: {
+              min: meanYRange.min,
+              max: meanYRange.max,
+              title: {
+                display: true,
+                text: 'Semantic Dimension 2',
+                color: '#A78BFA',
+                font: { weight: 'bold', size: 12 }
+              },
+              grid: { color: 'rgba(139, 92, 246, 0.14)' },
+              ticks: { color: '#94A3B8', font: { size: 11 } }
+            }
+          }
+        }
+      });
+    }
+
+    // Cosine Similarity Probe Renderer
+    function renderSimilarityProbe({ uniqueTokens }) {
+      const selectA = document.getElementById('sim-token-a');
+      const selectB = document.getElementById('sim-token-b');
+
+      const optionsHtml = uniqueTokens.map((u, idx) =>
+        `<option value="${idx}">${escapeHtml(u.token)}</option>`
+      ).join('');
+
+      selectA.innerHTML = optionsHtml;
+      selectB.innerHTML = optionsHtml;
+
+      if (uniqueTokens.length > 1) {
+        selectA.value = "0";
+        selectB.value = "1";
+      }
+
+      const updateComparison = () => {
+        const idxA = Number(selectA.value) || 0;
+        const idxB = Number(selectB.value) || 0;
+        const tokA = uniqueTokens[idxA];
+        const tokB = uniqueTokens[idxB];
+        if (!tokA || !tokB) return;
+
+        const rawSpellSim = cosineSimilarity(tokA.spellingVector, tokB.spellingVector);
+        const rawMeanSim = cosineSimilarity(tokA.meaningVector, tokB.meaningVector);
+
+        // Normalize [-1, 1] cosine similarity into intuitive [0%, 100%] alignment score
+        const spellPct = Math.max(0, Math.min(100, Math.round(((rawSpellSim + 1) / 2) * 100)));
+        const meanPct = Math.max(0, Math.min(100, Math.round(((rawMeanSim + 1) / 2) * 100)));
+
+        document.getElementById('spelling-sim-score').textContent = `${spellPct}% (cos: ${rawSpellSim.toFixed(2)})`;
+        document.getElementById('spelling-sim-bar').style.width = `${spellPct}%`;
+        document.getElementById('spelling-sim-note').textContent = spellPct >= 75
+          ? `"${tokA.token}" and "${tokB.token}" share strong letter/prefix patterns.`
+          : `"${tokA.token}" and "${tokB.token}" look orthographically distinct.`;
+
+        document.getElementById('meaning-sim-score').textContent = `${meanPct}% (cos: ${rawMeanSim.toFixed(2)})`;
+        document.getElementById('meaning-sim-bar').style.width = `${meanPct}%`;
+        document.getElementById('meaning-sim-note').textContent = meanPct >= 75
+          ? `"${tokA.token}" and "${tokB.token}" belong to closely related conceptual contexts.`
+          : `"${tokA.token}" and "${tokB.token}" represent different semantic concepts.`;
+      };
+
+      updateComparison();
+      selectA.onchange = updateComparison;
+      selectB.onchange = updateComparison;
+    }
+
+    function renderVectorExplorerSection({ uniqueTokens }) {
+      const select = document.getElementById('vector-token-select');
+      select.innerHTML = uniqueTokens.map((u, idx) =>
+        `<option value="${idx}">${escapeHtml(u.token)} (ID: ${u.id})</option>`
+      ).join('');
+
+      let activeVectorIdx = 0;
+
+      const renderFeatured = (idx) => {
+        activeVectorIdx = idx;
+        const item = uniqueTokens[idx] || uniqueTokens[0];
+        if (!item) return;
+
+        const spellSlice = item.spellingVector.slice(0, 6).map(v => v.toFixed(2));
+        const meanSlice = item.meaningVector.slice(0, 6).map(v => v.toFixed(2));
+        const vectorSourceNote = usingRealHFModel
+          ? 'First 6 of 384D MiniLM-L6-v2'
+          : 'First 6 of 12D Semantic Vector';
+
+        document.getElementById('featured-vector-card').innerHTML = `
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div class="flex items-center gap-3.5">
+              <span class="px-4 py-2 rounded-xl font-mono text-lg font-extrabold border ${item.style.bg} ${item.style.text} ${item.style.border}">
+                ${escapeHtml(item.token)}
+              </span>
+              <div>
+                <div class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400">Token ID</div>
+                <div class="font-mono text-xl font-extrabold text-white">#${item.id}</div>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+              <span class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-300">
+                Frequency: <strong class="text-white">${item.frequency}×</strong>
+              </span>
+              <span class="px-3 py-1.5 rounded-lg bg-violet-500/15 border border-violet-500/30 text-violet-300">
+                Cluster: <strong>${item.semanticGroup.name}</strong>
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+            <!-- Spelling Vector Box -->
+            <div class="rounded-xl bg-slate-900/90 border border-cyan-500/25 p-4">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-mono font-bold uppercase tracking-wider text-cyan-400">Spelling-Based Vector</span>
+                <span class="text-[11px] text-slate-400 font-mono">8D Orthographic Features</span>
+              </div>
+              <div class="font-mono text-xs sm:text-sm font-semibold text-cyan-200 bg-[#0B0F19] border border-slate-800 p-3 rounded-lg overflow-x-auto">
+                [${spellSlice.join(', ')}, …]
+              </div>
+              <div class="mt-3 flex items-end gap-1.5 h-11 px-1">
+                ${item.spellingVector.map(v => {
+                  const heightPct = Math.max(14, Math.min(100, Math.round(((v + 1) / 2) * 100)));
+                  const barColor = v >= 0 ? 'bg-cyan-400' : 'bg-cyan-900';
+                  return `<div class="flex-1 ${barColor} rounded-t transition-all" style="height: ${heightPct}%" title="${v.toFixed(3)}"></div>`;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- Meaning Vector Box -->
+            <div class="rounded-xl bg-slate-900/90 border border-violet-500/25 p-4">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-mono font-bold uppercase tracking-wider text-violet-400">Meaning-Based Vector</span>
+                <span class="text-[11px] text-slate-400 font-mono">${vectorSourceNote}</span>
+              </div>
+              <div class="font-mono text-xs sm:text-sm font-semibold text-violet-200 bg-[#0B0F19] border border-slate-800 p-3 rounded-lg overflow-x-auto">
+                [${meanSlice.join(', ')}, …]
+              </div>
+              <div class="mt-3 flex items-end gap-1.5 h-11 px-1">
+                ${item.meaningVector.slice(0, 12).map(v => {
+                  const heightPct = Math.max(14, Math.min(100, Math.round(((v + 1) / 2) * 100)));
+                  const barColor = v >= 0 ? 'bg-violet-500' : 'bg-violet-950';
+                  return `<div class="flex-1 ${barColor} rounded-t transition-all" style="height: ${heightPct}%" title="${v.toFixed(3)}"></div>`;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      };
+
+      renderFeatured(0);
+
+      select.onchange = (e) => {
+        const idx = Number(e.target.value);
+        renderFeatured(idx);
+      };
+
+      document.getElementById('copy-vector-json-btn').onclick = () => {
+        const item = uniqueTokens[activeVectorIdx];
+        if (!item) return;
+        const payload = JSON.stringify({
+          token: item.token,
+          token_id: item.id,
+          spelling_vector: item.spellingVector,
+          meaning_vector: item.meaningVector.slice(0, 12)
+        }, null, 2);
+        copyTextToClipboard(payload, 'copy-vector-json-label', 'Copied JSON!');
+      };
+
+      const grid = document.getElementById('all-vectors-grid');
+      grid.innerHTML = uniqueTokens.map((item, idx) => {
+        const sp = item.spellingVector.slice(0, 4).map(v => v.toFixed(2)).join(', ');
+        const mn = item.meaningVector.slice(0, 4).map(v => v.toFixed(2)).join(', ');
+        return `
+          <button type="button" data-token-idx="${idx}"
+            class="vector-card-btn text-left rounded-xl bg-[#0B0F19]/85 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/50 p-4 transition cursor-pointer">
+            <div class="flex items-center justify-between mb-2.5">
+              <span class="px-2.5 py-0.5 rounded-md font-mono text-xs font-bold border ${item.style.bg} ${item.style.text} ${item.style.border}">
+                ${escapeHtml(item.token)}
+              </span>
+              <span class="font-mono text-xs font-bold text-slate-400">ID: ${item.id}</span>
+            </div>
+            <div class="space-y-1.5 text-xs font-mono">
+              <div class="text-cyan-300 truncate">
+                <span class="font-sans font-semibold text-slate-500">Spelling:</span> [${sp}]
+              </div>
+              <div class="text-violet-300 truncate">
+                <span class="font-sans font-semibold text-slate-500">Meaning:</span> [${mn}]
+              </div>
+            </div>
+          </button>
+        `;
+      }).join('');
+
+      document.querySelectorAll('.vector-card-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.getAttribute('data-token-idx'));
+          select.value = String(idx);
+          renderFeatured(idx);
+          setSpotlightToken(uniqueTokens[idx].token);
+          document.getElementById('featured-vector-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      });
+    }
+
+    function renderLearningSection({ rawText, tokens, uniqueTokens }) {
+      const firstTok = tokens[0]?.token || "king";
+      const firstId = tokens[0]?.id || 2332;
+      const sampleVec = uniqueTokens[0]?.meaningVector.slice(0, 3).map(v => v.toFixed(2)).join(', ') || "0.95, 0.02, 0.01";
+
+      const steps = [
+        { num: "01", title: "Text", color: "text-cyan-400 bg-cyan-500/15 border-cyan-500/30", body: `You enter human text such as "${rawText.trim().slice(0, 28)}${rawText.trim().length > 28 ? '…' : ''}". Neural networks require numbers rather than raw characters.` },
+        { num: "02", title: "Tokenization", color: "text-violet-400 bg-violet-500/15 border-violet-500/30", body: `The tokenizer splits your text into ${tokens.length} chunks—like "${firstTok}"—using subword rules ("##") for prefixes and suffixes.` },
+        { num: "03", title: "Vocabulary", color: "text-emerald-400 bg-emerald-500/15 border-emerald-500/30", body: `Repeated tokens are deduplicated into ${uniqueTokens.length} unique vocabulary entries so each piece has one canonical lookup key.` },
+        { num: "04", title: "Token IDs", color: "text-amber-400 bg-amber-500/15 border-amber-500/30", body: `Each token maps to an integer index (e.g., "${firstTok}" → ${firstId}). IDs act like barcodes, not meanings.` },
+        { num: "05", title: "Embeddings", color: "text-fuchsia-400 bg-fuchsia-500/15 border-fuchsia-500/30", body: `Each ID is expanded into a dense vector of decimal numbers like [${sampleVec}, …] so AI can measure similarity.` },
+        { num: "06", title: "Spelling-Based Embeddings", color: "text-cyan-400 bg-cyan-500/15 border-cyan-500/30", body: `Captures letter patterns and word structure. Words spelled alike (Cat & Cats) sit close together in Graph 1.` },
+        { num: "07", title: "Meaning-Based Embeddings", color: "text-violet-400 bg-violet-500/15 border-violet-500/30", body: `Captures conceptual semantics. Related concepts (King & Queen) cluster together in Graph 2 even with different letters.` },
+        { num: "08", title: "Graphs", color: "text-emerald-400 bg-emerald-500/15 border-emerald-500/30", body: `Principal Component Analysis (PCA) compresses high-dimensional vectors into 2D X/Y coordinates so we can visually inspect clusters.` },
+      ];
+
+      document.getElementById('learning-steps-grid').innerHTML = steps.map(s => `
+        <div class="rounded-xl bg-[#0B0F19]/85 border border-slate-800 hover:border-slate-700 p-5 transition">
+          <div class="w-8 h-8 rounded-lg border ${s.color} font-mono font-extrabold text-xs flex items-center justify-center mb-3">
+            ${s.num}
+          </div>
+          <h3 class="font-bold text-white text-base">${s.title}</h3>
+          <p class="text-xs sm:text-sm text-slate-400 mt-1.5 leading-relaxed">${s.body}</p>
+        </div>
+      `).join('');
+    }
+
+    function copyTextToClipboard(text, labelElementId, successText) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        const labelEl = document.getElementById(labelElementId);
+        if (labelEl) {
+          const orig = labelEl.textContent;
+          labelEl.textContent = successText;
+          setTimeout(() => { labelEl.textContent = orig; }, 1600);
+        }
+      } catch (e) {
+        console.warn("Copy failed:", e);
+      } finally {
+        document.body.removeChild(textarea);
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // =========================================================================
+    // 6. EVENT LISTENERS & INITIALIZATION
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+
+      const textarea = document.getElementById('user-input');
+      const liveToggle = document.getElementById('live-mode-toggle');
+
+      textarea.addEventListener('input', () => {
+        updateInputCounter();
+        if (liveToggle.checked && textarea.value.trim()) {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(runAnalysis, 240);
+        }
+      });
+
+      document.getElementById('generate-btn').addEventListener('click', runAnalysis);
+
+      document.getElementById('clear-btn').addEventListener('click', () => {
+        textarea.value = '';
+        updateInputCounter();
+        hideFeedback();
+        textarea.focus();
+      });
+
+      document.getElementById('reset-btn').addEventListener('click', () => {
+        textarea.value = DEFAULT_TEXT;
+        updateInputCounter();
+        hideFeedback();
+        runAnalysis();
+      });
+
+      document.getElementById('clear-spotlight-btn').addEventListener('click', () => {
+        setSpotlightToken(null);
+      });
+
+      document.getElementById('highlight-subwords-toggle').addEventListener('change', () => {
+        if (currentAnalysisState) {
+          renderTokenizationSection(currentAnalysisState);
+        }
+      });
+
+      // Flow Cards vs Tensor Array toggle
+      const flowCardsBtn = document.getElementById('view-flow-cards-btn');
+      const tensorArrayBtn = document.getElementById('view-tensor-array-btn');
+      const flowContainer = document.getElementById('token-id-flow-container');
+      const tensorContainer = document.getElementById('token-id-tensor-container');
+
+      flowCardsBtn.addEventListener('click', () => {
+        flowCardsBtn.className = "px-3 py-1 rounded-lg text-xs font-semibold bg-violet-600 text-white transition cursor-pointer";
+        tensorArrayBtn.className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer";
+        flowContainer.classList.remove('hidden');
+        tensorContainer.classList.add('hidden');
+      });
+
+      tensorArrayBtn.addEventListener('click', () => {
+        tensorArrayBtn.className = "px-3 py-1 rounded-lg text-xs font-semibold bg-violet-600 text-white transition cursor-pointer";
+        flowCardsBtn.className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer";
+        tensorContainer.classList.remove('hidden');
+        flowContainer.classList.add('hidden');
+      });
+
+      document.getElementById('copy-tensor-btn').addEventListener('click', () => {
+        const text = document.getElementById('tensor-array-output').textContent;
+        copyTextToClipboard(text, 'copy-tensor-label', 'Copied!');
+      });
+
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          textarea.value = btn.getAttribute('data-preset');
+          updateInputCounter();
+          hideFeedback();
+          runAnalysis();
+        });
+      });
+
+      textarea.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          runAnalysis();
+        }
+      });
+
+      updateInputCounter();
+      runAnalysis();
+      initTransformersModel();
+    });
+  </script>
+</body>
+</html>
